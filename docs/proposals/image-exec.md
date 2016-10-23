@@ -1,3 +1,32 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Image Exec
 
 This proposal seeks to create a mechanism to execute a shell or other
@@ -49,7 +78,7 @@ A good solution SHOULD:
     rather than a config-time solution)
   - not require direct access to the node
   - re-use existing container image distribution channels
-  - enable detection of pods that have been modified by an exec (¿tainted¿ pods)
+  - enable detection of pods that have been modified by an exec ("tainted" pods)
 
 ## User Stories
 
@@ -151,7 +180,7 @@ for inclusion in the troubleshooting container's `ContainerConfig` with a
 the container is created.
 
 We could instead modify CRI's `CreateContainer` to include a list of containers
-IDs to ¿link¿ to the newly created container, but then we¿d have to repeat the
+IDs to "link" to the newly created container, but then we'd have to repeat the
 logic in each of the container backends.
 
 ### Legacy Container Runtimes
@@ -173,6 +202,8 @@ and return "Not Implemented" for the legacy runtimes.
   Kubernetes?
 * Is this compatible with Admission control plugins that restrict what images
   can run on a cluster?
+* Would it be possible to Image Exec into pods that are in a terminal state to
+  determine why they've failed?
 
 ## Alternatives Considered
 
@@ -200,7 +231,7 @@ while the latter would provide binaries for kubectl exec.
 Adding a container to a running pod would be a large change to Kubernetes, and
 there are several edge cases to consider such as resource limits and monitoring.
 Adding a volume to a running container would be a smaller change, but it would
-still be larger than the proposed change and we¿d have to figure out how to
+still be larger than the proposed change and we'd have to figure out how to
 build and distribute a volume of binaries.
 
 ### Implicit Empty Volume
@@ -236,7 +267,12 @@ coupling it with container images.
 
   - [Tracking Issue](https://issues.k8s.io/27140)
   - [Container Runtime Interface Proposal](container-runtime-interface-v1.md)
-  - [Container Runtime Interface proto](https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/api/v1alpha1/runtime/api.proto)
+  - [Container Runtime Interface proto](../../pkg/kubelet/api/v1alpha1/runtime/api.proto)
   - [CRI Initial PR](https://github.com/kubernetes/kubernetes/pull/25899)
   - [CRI Tracking Issue](https://issues.k8s.io/28789)
   - [CRI: expose optional runtime features](https://issues.k8s.io/32803)
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/image-exec.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->
