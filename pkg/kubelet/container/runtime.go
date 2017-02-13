@@ -333,6 +333,8 @@ type ContainerStatus struct {
 	// Message written by the container before exiting (stored in
 	// TerminationMessagePath).
 	Message string
+	// TODO(verb)
+	Type string
 }
 
 // FindContainerStatusByName returns container status in the pod status with the given name.

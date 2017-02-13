@@ -114,6 +114,7 @@ type KubeGenericRuntime interface {
 	kubecontainer.Runtime
 	kubecontainer.IndirectStreamingRuntime
 	kubecontainer.ContainerCommandRunner
+	RunDebugContainer(pod *v1.Pod, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) error
 }
 
 // NewKubeGenericRuntimeManager creates a new kubeGenericRuntimeManager
@@ -511,6 +512,12 @@ func (m *kubeGenericRuntimeManager) computePodContainerChanges(pod *v1.Pod, podS
 	// compute containers to be killed
 	runningContainerStatuses := podStatus.GetRunningContainerStatuses()
 	for _, containerStatus := range runningContainerStatuses {
+		// Debug Containers should never be killed by SyncPod()
+		glog.Infof("HACK: Name,Type is %q,%q", containerStatus.Name, containerStatus.Type)
+		// TODO(verb): make it a constant
+		if containerStatus.Type == "DEBUG" {
+			continue
+		}
 		_, keep := changes.ContainersToKeep[containerStatus.ID]
 		_, keepInit := changes.InitContainersToKeep[containerStatus.ID]
 		if !keep && !keepInit {

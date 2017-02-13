@@ -49,6 +49,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
@@ -1477,11 +1478,30 @@ func (kl *Kubelet) GetExec(podFullName string, podUID types.UID, containerName s
 
 // GetAttach gets the URL the attach will be served from, or nil if the Kubelet will serve it.
 func (kl *Kubelet) GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommand.Options) (*url.URL, error) {
+	// TODO(verb): Put this some place same...
+	pod, found := kl.GetPodByFullName(podFullName)
+	if !found || (string(podUID) != "" && pod.UID != podUID) {
+		return nil, fmt.Errorf("HACK: pod %s not found", podFullName)
+	}
+	pullSecrets, err := kl.getPullSecretsForPod(pod)
+	if err != nil {
+		glog.Errorf("HACK: Unable to get pull secrets for pod %q: %v", format.Pod(pod), err)
+		return nil, err
+	}
+
+	r := kl.containerRuntime.(kuberuntime.KubeGenericRuntime) // TODO(verb): this obviously won't do
+	if err := r.RunDebugContainer(pod, pullSecrets, kl.backOff); err != nil {
+		return nil, fmt.Errorf("HACK: error creating debug container: %v", err)
+	}
+	containerName = "debugshell"
+
 	switch streamingRuntime := kl.containerRuntime.(type) {
 	case kubecontainer.DirectStreamingRuntime:
+		glog.Infof("HACK: Here I am with a (direct) attach request for %s, %s", podFullName, containerName)
 		// Kubelet will serve the attach directly.
 		return nil, nil
 	case kubecontainer.IndirectStreamingRuntime:
+		glog.Infof("HACK: Here I am with an (indirect) attach request for %s, %s", podFullName, containerName)
 		container, err := kl.findContainer(podFullName, podUID, containerName)
 		if err != nil {
 			return nil, err

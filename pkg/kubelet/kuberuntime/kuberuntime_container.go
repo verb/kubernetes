@@ -41,6 +41,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	kubetypes "k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/flowcontrol"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/util/tail"
 )
@@ -394,6 +397,7 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 				ID:   c.Id,
 			},
 			Name:         labeledInfo.ContainerName,
+			Type:         labeledInfo.ContainerType,
 			Image:        status.Image.Image,
 			ImageID:      status.ImageRef,
 			Hash:         annotatedInfo.Hash,
@@ -728,6 +732,35 @@ func (m *kubeGenericRuntimeManager) RunInContainer(id kubecontainer.ContainerID,
 	// for logging purposes. A combined output option will need to be added to the ExecSyncRequest
 	// if more precise output ordering is ever required.
 	return append(stdout, stderr...), err
+}
+
+// TODO(verb)
+func (m *kubeGenericRuntimeManager) RunDebugContainer(pod *v1.Pod, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) error {
+	glog.Info("HACK: Running debug container in pod", *pod)
+	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	if err != nil {
+		return fmt.Errorf("HACK: %v", err)
+	}
+
+	podSandboxConfig, err := m.generatePodSandboxConfig(pod, 0)
+	if err != nil {
+		return fmt.Errorf("HACK: %v", err)
+	}
+
+	container := &v1.Container{
+		Name:    "debugshell",
+		Command: []string{"/bin/sh"},
+		Image:   "alpine",
+		Stdin:   true,
+		TTY:     true,
+	}
+
+	if _, err := m.startContainer(podStatus.SandboxStatuses[0].GetId(), podSandboxConfig, container, pod, podStatus, pullSecrets, podStatus.IP); err != nil {
+		return fmt.Errorf("HACK: an error, unsurprisingly: %v", err)
+	}
+
+	glog.Info("HACK: I guess RunDebugContainer worked...")
+	return nil
 }
 
 // removeContainer removes the container and the container logs.

@@ -56,6 +56,7 @@ type annotatedPodSandboxInfo struct {
 
 type labeledContainerInfo struct {
 	ContainerName string
+	ContainerType string
 	PodName       string
 	PodNamespace  string
 	PodUID        kubetypes.UID
@@ -100,6 +101,13 @@ func newContainerLabels(container *v1.Container, pod *v1.Pod) map[string]string 
 	labels[types.KubernetesPodNamespaceLabel] = pod.Namespace
 	labels[types.KubernetesPodUIDLabel] = string(pod.UID)
 	labels[types.KubernetesContainerNameLabel] = container.Name
+	labels[types.KubernetesContainerTypeLabel] = "REGULAR" // TODO(verb): make a constant
+	labels[kubernetesManagedLabel] = "true"
+
+	// TODO(verb): prototype hack
+	if container.Name == "debug" {
+		labels[types.KubernetesContainerTypeLabel] = "DEBUG" // TODO(verb): make a constant
+	}
 
 	return labels
 }
@@ -174,6 +182,7 @@ func getContainerInfoFromLabels(labels map[string]string) *labeledContainerInfo 
 		PodNamespace:  getStringValueFromLabel(labels, types.KubernetesPodNamespaceLabel),
 		PodUID:        kubetypes.UID(getStringValueFromLabel(labels, types.KubernetesPodUIDLabel)),
 		ContainerName: getStringValueFromLabel(labels, types.KubernetesContainerNameLabel),
+		ContainerType: getStringValueFromLabel(labels, types.KubernetesContainerTypeLabel),
 	}
 }
 
