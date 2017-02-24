@@ -99,6 +99,7 @@ func (d *dockerService) ListPodSandbox(ctx context.Context, r *runtimeapi.ListPo
 }
 
 func (d *dockerService) CreateContainer(ctx context.Context, r *runtimeapi.CreateContainerRequest) (*runtimeapi.CreateContainerResponse, error) {
+	pp.Dump(r)
 	containerId, err := d.runtimeService.CreateContainer(r.PodSandboxId, r.GetConfig(), r.GetSandboxConfig())
 	if err != nil {
 		return nil, err

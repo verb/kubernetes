@@ -114,7 +114,7 @@ type KubeGenericRuntime interface {
 	kubecontainer.Runtime
 	kubecontainer.IndirectStreamingRuntime
 	kubecontainer.ContainerCommandRunner
-	RunDebugContainer(pod *v1.Pod, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) error
+	RunDebugContainer(pod *v1.Pod, pullSecrets []v1.Secret) error
 }
 
 // NewKubeGenericRuntimeManager creates a new kubeGenericRuntimeManager

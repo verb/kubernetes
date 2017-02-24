@@ -102,10 +102,9 @@ func newContainerLabels(container *v1.Container, pod *v1.Pod) map[string]string 
 	labels[types.KubernetesPodUIDLabel] = string(pod.UID)
 	labels[types.KubernetesContainerNameLabel] = container.Name
 	labels[types.KubernetesContainerTypeLabel] = "REGULAR" // TODO(verb): make a constant
-	labels[kubernetesManagedLabel] = "true"
 
 	// TODO(verb): prototype hack
-	if container.Name == "debug" {
+	if container.Name == "debugshell" {
 		labels[types.KubernetesContainerTypeLabel] = "DEBUG" // TODO(verb): make a constant
 	}
 

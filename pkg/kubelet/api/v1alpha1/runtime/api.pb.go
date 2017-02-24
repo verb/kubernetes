@@ -1058,6 +1058,8 @@ type ContainerConfig struct {
 	Envs []*KeyValue `protobuf:"bytes,6,rep,name=envs" json:"envs,omitempty"`
 	// Mounts for the container.
 	Mounts []*Mount `protobuf:"bytes,7,rep,name=mounts" json:"mounts,omitempty"`
+	// Other Container Images to mount
+	//ContainerMounts []string
 	// Devices for the container.
 	Devices []*Device `protobuf:"bytes,8,rep,name=devices" json:"devices,omitempty"`
 	// Key-value pairs that may be used to scope and select individual resources.

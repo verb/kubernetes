@@ -41,9 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	kubetypes "k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/flowcontrol"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/util/tail"
 )
@@ -735,7 +732,7 @@ func (m *kubeGenericRuntimeManager) RunInContainer(id kubecontainer.ContainerID,
 }
 
 // TODO(verb)
-func (m *kubeGenericRuntimeManager) RunDebugContainer(pod *v1.Pod, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) error {
+func (m *kubeGenericRuntimeManager) RunDebugContainer(pod *v1.Pod, pullSecrets []v1.Secret) error {
 	glog.Info("HACK: Running debug container in pod", *pod)
 	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	if err != nil {
@@ -755,7 +752,7 @@ func (m *kubeGenericRuntimeManager) RunDebugContainer(pod *v1.Pod, pullSecrets [
 		TTY:     true,
 	}
 
-	if _, err := m.startContainer(podStatus.SandboxStatuses[0].GetId(), podSandboxConfig, container, pod, podStatus, pullSecrets, podStatus.IP); err != nil {
+	if _, err := m.startContainer(podStatus.SandboxStatuses[0].Id, podSandboxConfig, container, pod, podStatus, pullSecrets, podStatus.IP); err != nil {
 		return fmt.Errorf("HACK: an error, unsurprisingly: %v", err)
 	}
 

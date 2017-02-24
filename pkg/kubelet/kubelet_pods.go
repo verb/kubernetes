@@ -1382,6 +1382,9 @@ func (kl *Kubelet) findContainer(podFullName string, podUID types.UID, container
 	if err != nil {
 		return nil, err
 	}
+	if containerName == "debugshell" {
+		pp.Dump(pods)
+	}
 	podUID = kl.podManager.TranslatePodUID(podUID)
 	pod := kubecontainer.Pods(pods).FindPod(podFullName, podUID)
 	return pod.FindContainerByName(containerName), nil
@@ -1490,10 +1493,11 @@ func (kl *Kubelet) GetAttach(podFullName string, podUID types.UID, containerName
 	}
 
 	r := kl.containerRuntime.(kuberuntime.KubeGenericRuntime) // TODO(verb): this obviously won't do
-	if err := r.RunDebugContainer(pod, pullSecrets, kl.backOff); err != nil {
+	if err := r.RunDebugContainer(pod, pullSecrets); err != nil {
 		return nil, fmt.Errorf("HACK: error creating debug container: %v", err)
 	}
 	containerName = "debugshell"
+	time.Sleep(time.Second * 2) // HACK HACK HACK
 
 	switch streamingRuntime := kl.containerRuntime.(type) {
 	case kubecontainer.DirectStreamingRuntime:
@@ -1510,18 +1514,24 @@ func (kl *Kubelet) GetAttach(podFullName string, podUID types.UID, containerName
 			return nil, fmt.Errorf("container %s not found in pod %s", containerName, podFullName)
 		}
 
-		// The TTY setting for attach must match the TTY setting in the initial container configuration,
-		// since whether the process is running in a TTY cannot be changed after it has started.  We
-		// need the api.Pod to get the TTY status.
-		pod, found := kl.GetPodByFullName(podFullName)
-		if !found || (string(podUID) != "" && pod.UID != podUID) {
-			return nil, fmt.Errorf("pod %s not found", podFullName)
+		pp.Dump("Found container", container)
+		var tty bool
+		if containerName != "debugshell" {
+			// The TTY setting for attach must match the TTY setting in the initial container configuration,
+			// since whether the process is running in a TTY cannot be changed after it has started.  We
+			// need the api.Pod to get the TTY status.
+			pod, found := kl.GetPodByFullName(podFullName)
+			if !found || (string(podUID) != "" && pod.UID != podUID) {
+				return nil, fmt.Errorf("pod %s not found", podFullName)
+			}
+			containerSpec := kubecontainer.GetContainerSpec(pod, containerName)
+			if containerSpec == nil {
+				return nil, fmt.Errorf("container %s not found in pod %s", containerName, podFullName)
+			}
+			tty = containerSpec.TTY
+		} else {
+			tty = true
 		}
-		containerSpec := kubecontainer.GetContainerSpec(pod, containerName)
-		if containerSpec == nil {
-			return nil, fmt.Errorf("container %s not found in pod %s", containerName, podFullName)
-		}
-		tty := containerSpec.TTY
 
 		return streamingRuntime.GetAttach(container.ID, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, tty)
 	default:
