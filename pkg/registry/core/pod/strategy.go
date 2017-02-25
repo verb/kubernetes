@@ -421,6 +421,18 @@ func ExecLocation(
 	return streamLocation(getter, connInfo, ctx, name, opts, opts.Container, "exec")
 }
 
+// DebugLocation returns the exec URL for a pod container. If opts.Container is blank
+// and only one container is present in the pod, that container is used.
+func DebugLocation(
+	getter ResourceGetter,
+	connInfo client.ConnectionInfoGetter,
+	ctx genericapirequest.Context,
+	name string,
+	opts *api.PodExecOptions,
+) (*url.URL, http.RoundTripper, error) {
+	return streamLocation(getter, connInfo, ctx, name, opts, opts.Container, "debug")
+}
+
 func streamLocation(
 	getter ResourceGetter,
 	connInfo client.ConnectionInfoGetter,
