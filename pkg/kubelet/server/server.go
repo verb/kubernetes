@@ -318,6 +318,23 @@ func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 
 	ws = new(restful.WebService)
 	ws.
+		Path("/debug")
+	ws.Route(ws.GET("/{podNamespace}/{podID}").
+		To(s.getDebug).
+		Operation("getDebug"))
+	ws.Route(ws.POST("/{podNamespace}/{podID}").
+		To(s.getDebug).
+		Operation("getDebug"))
+	ws.Route(ws.GET("/{podNamespace}/{podID}/{uid}").
+		To(s.getDebug).
+		Operation("getDebug"))
+	ws.Route(ws.POST("/{podNamespace}/{podID}/{uid}").
+		To(s.getDebug).
+		Operation("getDebug"))
+	s.restfulCont.Add(ws)
+
+	ws = new(restful.WebService)
+	ws.
 		Path("/attach")
 	ws.Route(ws.GET("/{podNamespace}/{podID}/{containerName}").
 		To(s.getAttach).
@@ -587,6 +604,24 @@ func getExecRequestParams(req *restful.Request) execRequestParams {
 	}
 }
 
+type debugRequestParams struct {
+	podNamespace  string
+	podName       string
+	podUID        types.UID
+	containerName string
+	cmd           []string
+}
+
+func getDebugRequestParams(req *restful.Request) debugRequestParams {
+	return debugRequestParams{
+		podNamespace:  req.PathParameter("podNamespace"),
+		podName:       req.PathParameter("podID"),
+		podUID:        types.UID(req.PathParameter("uid")),
+		containerName: req.PathParameter("containerName"),
+		cmd:           req.Request.URL.Query()[api.ExecCommandParamm],
+	}
+}
+
 type portForwardRequestParams struct {
 	podNamespace string
 	podName      string
@@ -642,6 +677,7 @@ func (s *Server) getAttach(request *restful.Request, response *restful.Response)
 // getExec handles requests to run a command inside a container.
 func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 	params := getExecRequestParams(request)
+	pp.Dump(params, request.Request.URL)
 	streamOpts, err := remotecommand.NewOptions(request.Request)
 	if err != nil {
 		utilruntime.HandleError(err)
@@ -671,6 +707,48 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 		podFullName,
 		params.podUID,
 		params.containerName,
+		params.cmd,
+		streamOpts,
+		s.host.StreamingConnectionIdleTimeout(),
+		remotecommand.DefaultStreamCreationTimeout,
+		remotecommand.SupportedStreamingProtocols)
+}
+
+// getDebug handles requests to add a debug container to a pod
+func (s *Server) getDebug(request *restful.Request, response *restful.Response) {
+	params := getDebugRequestParams(request)
+	glog.Info(pp.Sdump(params))
+	streamOpts, err := remotecommand.NewOptions(request.Request)
+	if err != nil {
+		utilruntime.HandleError(err)
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+	pod, ok := s.host.GetPodByName(params.podNamespace, params.podName)
+	if !ok {
+		response.WriteError(http.StatusNotFound, fmt.Errorf("pod does not exist"))
+		return
+	}
+
+	podFullName := kubecontainer.GetPodFullName(pod)
+	containerName := "debugshell"
+	//redirect, err := s.host.GetDebug(podFullName, params.podUID, params.containerName, params.cmd, *streamOpts)
+	redirect, err := s.host.GetExec(podFullName, params.podUID, containerName, params.cmd, *streamOpts)
+	if err != nil {
+		streaming.WriteError(err, response.ResponseWriter)
+		return
+	}
+	if redirect != nil {
+		http.Redirect(response.ResponseWriter, request.Request, redirect.String(), http.StatusFound)
+		return
+	}
+
+	remotecommand.ServeExec(response.ResponseWriter,
+		request.Request,
+		s.host,
+		podFullName,
+		params.podUID,
+		containerName,
 		params.cmd,
 		streamOpts,
 		s.host.StreamingConnectionIdleTimeout(),
