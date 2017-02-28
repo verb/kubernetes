@@ -6036,6 +6036,86 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
 		},
+		"k8s.io/kubernetes/pkg/api/v1.PodDebugOptions": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "PodDebugOptions TODO(verb)",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"stdin": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Redirect the standard input stream of the pod for this call. Defaults to false.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+						"stdout": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Redirect the standard output stream of the pod for this call. Defaults to true.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+						"stderr": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Redirect the standard error stream of the pod for this call. Defaults to true.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+						"tty": {
+							SchemaProps: spec.SchemaProps{
+								Description: "TTY if true indicates that a tty will be allocated for the exec call. Defaults to false.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+						"container": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Container in which to execute the command. Defaults to only container if there is only one container in the pod.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"command": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Command is the remote command to execute. argv array. Not executed within a shell.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
+						"image": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"string"},
+								Format: "",
+							},
+						},
+					},
+					Required: []string{"command", "image"},
+				},
+			},
+			Dependencies: []string{},
+		},
 		"k8s.io/kubernetes/pkg/api/v1.PodExecOptions": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{

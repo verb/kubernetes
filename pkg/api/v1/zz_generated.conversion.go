@@ -249,6 +249,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_PodAttachOptions_To_v1_PodAttachOptions,
 		Convert_v1_PodCondition_To_api_PodCondition,
 		Convert_api_PodCondition_To_v1_PodCondition,
+		Convert_v1_PodDebugOptions_To_api_PodDebugOptions,
+		Convert_api_PodDebugOptions_To_v1_PodDebugOptions,
 		Convert_v1_PodExecOptions_To_api_PodExecOptions,
 		Convert_api_PodExecOptions_To_v1_PodExecOptions,
 		Convert_v1_PodList_To_api_PodList,
@@ -2948,6 +2950,36 @@ func autoConvert_api_PodCondition_To_v1_PodCondition(in *api.PodCondition, out *
 
 func Convert_api_PodCondition_To_v1_PodCondition(in *api.PodCondition, out *PodCondition, s conversion.Scope) error {
 	return autoConvert_api_PodCondition_To_v1_PodCondition(in, out, s)
+}
+
+func autoConvert_v1_PodDebugOptions_To_api_PodDebugOptions(in *PodDebugOptions, out *api.PodDebugOptions, s conversion.Scope) error {
+	out.Stdin = in.Stdin
+	out.Stdout = in.Stdout
+	out.Stderr = in.Stderr
+	out.TTY = in.TTY
+	out.Container = in.Container
+	out.Command = *(*[]string)(unsafe.Pointer(&in.Command))
+	out.Image = in.Image
+	return nil
+}
+
+func Convert_v1_PodDebugOptions_To_api_PodDebugOptions(in *PodDebugOptions, out *api.PodDebugOptions, s conversion.Scope) error {
+	return autoConvert_v1_PodDebugOptions_To_api_PodDebugOptions(in, out, s)
+}
+
+func autoConvert_api_PodDebugOptions_To_v1_PodDebugOptions(in *api.PodDebugOptions, out *PodDebugOptions, s conversion.Scope) error {
+	out.Stdin = in.Stdin
+	out.Stdout = in.Stdout
+	out.Stderr = in.Stderr
+	out.TTY = in.TTY
+	out.Container = in.Container
+	out.Command = *(*[]string)(unsafe.Pointer(&in.Command))
+	out.Image = in.Image
+	return nil
+}
+
+func Convert_api_PodDebugOptions_To_v1_PodDebugOptions(in *api.PodDebugOptions, out *PodDebugOptions, s conversion.Scope) error {
+	return autoConvert_api_PodDebugOptions_To_v1_PodDebugOptions(in, out, s)
 }
 
 func autoConvert_v1_PodExecOptions_To_api_PodExecOptions(in *PodExecOptions, out *api.PodExecOptions, s conversion.Scope) error {

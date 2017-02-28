@@ -28,6 +28,7 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return scheme.AddDefaultingFuncs(
 		SetDefaults_PodExecOptions,
 		SetDefaults_PodAttachOptions,
+		SetDefaults_PodDebugOptions,
 		SetDefaults_ReplicationController,
 		SetDefaults_Volume,
 		SetDefaults_ContainerPort,
@@ -73,6 +74,10 @@ func SetDefaults_PodExecOptions(obj *PodExecOptions) {
 	obj.Stderr = true
 }
 func SetDefaults_PodAttachOptions(obj *PodAttachOptions) {
+	obj.Stdout = true
+	obj.Stderr = true
+}
+func SetDefaults_PodDebugOptions(obj *PodDebugOptions) {
 	obj.Stdout = true
 	obj.Stderr = true
 }

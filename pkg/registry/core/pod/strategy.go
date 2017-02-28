@@ -370,6 +370,25 @@ func streamParams(params url.Values, opts runtime.Object) error {
 		for _, c := range opts.Command {
 			params.Add("command", c)
 		}
+	case *api.PodDebugOptions:
+		if opts.Stdin {
+			params.Add(api.ExecStdinParam, "1")
+		}
+		if opts.Stdout {
+			params.Add(api.ExecStdoutParam, "1")
+		}
+		if opts.Stderr {
+			params.Add(api.ExecStderrParam, "1")
+		}
+		if opts.TTY {
+			params.Add(api.ExecTTYParam, "1")
+		}
+		for _, c := range opts.Command {
+			params.Add("command", c)
+		}
+		if opts.Image != "" {
+			params.Add(api.DebugImageParam, opts.Image)
+		}
 	case *api.PodAttachOptions:
 		if opts.Stdin {
 			params.Add(api.ExecStdinParam, "1")
@@ -421,16 +440,49 @@ func ExecLocation(
 	return streamLocation(getter, connInfo, ctx, name, opts, opts.Container, "exec")
 }
 
-// DebugLocation returns the exec URL for a pod container. If opts.Container is blank
-// and only one container is present in the pod, that container is used.
+// DebugLocation returns the debug URL for a pod container.
+// TODO(verb): should a blank container name be generated here?
 func DebugLocation(
 	getter ResourceGetter,
 	connInfo client.ConnectionInfoGetter,
 	ctx genericapirequest.Context,
 	name string,
-	opts *api.PodExecOptions,
+	opts *api.PodDebugOptions,
 ) (*url.URL, http.RoundTripper, error) {
-	return streamLocation(getter, connInfo, ctx, name, opts, opts.Container, "debug")
+	pod, err := getPod(getter, ctx, name)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Try to figure out a container
+	// If a container was provided, it must be valid
+	if opts.Container == "" {
+		return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", name))
+	}
+	if podHasContainerWithName(pod, opts.Container) {
+		return nil, nil, errors.NewBadRequest(fmt.Sprintf("container %s already exists for pod %s", opts.Container, name))
+	}
+
+	nodeName := types.NodeName(pod.Spec.NodeName)
+	if len(nodeName) == 0 {
+		// If pod has not been assigned a host, return an empty location
+		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
+	}
+	nodeInfo, err := connInfo.GetConnectionInfo(nodeName)
+	if err != nil {
+		return nil, nil, err
+	}
+	params := url.Values{}
+	if err := streamParams(params, opts); err != nil {
+		return nil, nil, err
+	}
+	loc := &url.URL{
+		Scheme:   nodeInfo.Scheme,
+		Host:     net.JoinHostPort(nodeInfo.Hostname, nodeInfo.Port),
+		Path:     fmt.Sprintf("/debug/%s/%s/%s", pod.Namespace, pod.Name, opts.Container),
+		RawQuery: params.Encode(),
+	}
+	return loc, nodeInfo.Transport, nil
 }
 
 func streamLocation(

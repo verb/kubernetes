@@ -145,6 +145,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodAntiAffinity, InType: reflect.TypeOf(&PodAntiAffinity{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodAttachOptions, InType: reflect.TypeOf(&PodAttachOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodCondition, InType: reflect.TypeOf(&PodCondition{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodDebugOptions, InType: reflect.TypeOf(&PodDebugOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodExecOptions, InType: reflect.TypeOf(&PodExecOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodList, InType: reflect.TypeOf(&PodList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodLogOptions, InType: reflect.TypeOf(&PodLogOptions{})},
@@ -2222,6 +2223,20 @@ func DeepCopy_api_PodCondition(in interface{}, out interface{}, c *conversion.Cl
 		*out = *in
 		out.LastProbeTime = in.LastProbeTime.DeepCopy()
 		out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
+		return nil
+	}
+}
+
+func DeepCopy_api_PodDebugOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*PodDebugOptions)
+		out := out.(*PodDebugOptions)
+		*out = *in
+		if in.Command != nil {
+			in, out := &in.Command, &out.Command
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
 		return nil
 	}
 }

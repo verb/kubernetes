@@ -212,11 +212,11 @@ func (r *DebugREST) New() runtime.Object {
 
 // Connect returns a handler for the pod exec proxy
 func (r *DebugREST) Connect(ctx genericapirequest.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
-	execOpts, ok := opts.(*api.PodExecOptions)
+	debugOpts, ok := opts.(*api.PodDebugOptions)
 	if !ok {
 		return nil, fmt.Errorf("invalid options object: %#v", opts)
 	}
-	location, transport, err := pod.DebugLocation(r.Store, r.KubeletConn, ctx, name, execOpts)
+	location, transport, err := pod.DebugLocation(r.Store, r.KubeletConn, ctx, name, debugOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +225,7 @@ func (r *DebugREST) Connect(ctx genericapirequest.Context, name string, opts run
 
 // NewConnectOptions returns the versioned object that represents exec parameters
 func (r *DebugREST) NewConnectOptions() (runtime.Object, bool, string) {
-	return &api.PodExecOptions{}, false, ""
+	return &api.PodDebugOptions{}, false, ""
 }
 
 // ConnectMethods returns the methods supported by exec
