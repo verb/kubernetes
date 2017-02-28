@@ -168,6 +168,7 @@ type HostInterface interface {
 	GetRunningPods() ([]*v1.Pod, error)
 	GetPodByName(namespace, name string) (*v1.Pod, bool)
 	RunInContainer(name string, uid types.UID, container string, cmd []string) ([]byte, error)
+	RunDebugContainer(podFullName string, podUID types.UID, containerName, imageName string, cmd []string) error
 	ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error
 	AttachContainer(name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan term.Size) error
 	GetKubeletContainerLogs(podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
@@ -319,16 +320,16 @@ func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 	ws = new(restful.WebService)
 	ws.
 		Path("/debug")
-	ws.Route(ws.GET("/{podNamespace}/{podID}").
+	ws.Route(ws.GET("/{podNamespace}/{podID}/{containerName}").
 		To(s.getDebug).
 		Operation("getDebug"))
-	ws.Route(ws.POST("/{podNamespace}/{podID}").
+	ws.Route(ws.POST("/{podNamespace}/{podID}/{containerName}").
 		To(s.getDebug).
 		Operation("getDebug"))
-	ws.Route(ws.GET("/{podNamespace}/{podID}/{uid}").
+	ws.Route(ws.GET("/{podNamespace}/{podID}/{uid}/{containerName}").
 		To(s.getDebug).
 		Operation("getDebug"))
-	ws.Route(ws.POST("/{podNamespace}/{podID}/{uid}").
+	ws.Route(ws.POST("/{podNamespace}/{podID}/{uid}/{containerName}").
 		To(s.getDebug).
 		Operation("getDebug"))
 	s.restfulCont.Add(ws)
@@ -600,7 +601,7 @@ func getExecRequestParams(req *restful.Request) execRequestParams {
 		podName:       req.PathParameter("podID"),
 		podUID:        types.UID(req.PathParameter("uid")),
 		containerName: req.PathParameter("containerName"),
-		cmd:           req.Request.URL.Query()[api.ExecCommandParamm],
+		cmd:           req.Request.URL.Query()[api.ExecCommandParam],
 	}
 }
 
@@ -609,6 +610,7 @@ type debugRequestParams struct {
 	podName       string
 	podUID        types.UID
 	containerName string
+	imageName     string
 	cmd           []string
 }
 
@@ -618,7 +620,8 @@ func getDebugRequestParams(req *restful.Request) debugRequestParams {
 		podName:       req.PathParameter("podID"),
 		podUID:        types.UID(req.PathParameter("uid")),
 		containerName: req.PathParameter("containerName"),
-		cmd:           req.Request.URL.Query()[api.ExecCommandParamm],
+		imageName:     req.Request.URL.Query().Get(api.DebugImageParam),
+		cmd:           req.Request.URL.Query()[api.ExecCommandParam],
 	}
 }
 
@@ -677,7 +680,6 @@ func (s *Server) getAttach(request *restful.Request, response *restful.Response)
 // getExec handles requests to run a command inside a container.
 func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 	params := getExecRequestParams(request)
-	pp.Dump(params, request.Request.URL)
 	streamOpts, err := remotecommand.NewOptions(request.Request)
 	if err != nil {
 		utilruntime.HandleError(err)
@@ -717,7 +719,14 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 // getDebug handles requests to add a debug container to a pod
 func (s *Server) getDebug(request *restful.Request, response *restful.Response) {
 	params := getDebugRequestParams(request)
-	glog.Info(pp.Sdump(params))
+	glog.Info("HACK: in getDebug()", pp.Sdump(params))
+
+	// TODO(verb): should this be checked further down the line?
+	if params.imageName == "" {
+		response.WriteError(http.StatusBadRequest, fmt.Errorf("image name required"))
+	}
+
+	// TODO(verb): should I be getting UID from the request? because that be broke
 	streamOpts, err := remotecommand.NewOptions(request.Request)
 	if err != nil {
 		utilruntime.HandleError(err)
@@ -731,9 +740,12 @@ func (s *Server) getDebug(request *restful.Request, response *restful.Response) 
 	}
 
 	podFullName := kubecontainer.GetPodFullName(pod)
-	containerName := "debugshell"
-	//redirect, err := s.host.GetDebug(podFullName, params.podUID, params.containerName, params.cmd, *streamOpts)
-	redirect, err := s.host.GetExec(podFullName, params.podUID, containerName, params.cmd, *streamOpts)
+	if err := s.host.RunDebugContainer(podFullName, params.podUID, params.containerName, params.imageName, params.cmd); err != nil {
+		response.WriteError(http.StatusInternalServerError, err) // TODO(verb): better error code?
+		return
+	}
+
+	redirect, err := s.host.GetAttach(podFullName, params.podUID, params.containerName, *streamOpts)
 	if err != nil {
 		streaming.WriteError(err, response.ResponseWriter)
 		return
@@ -743,13 +755,12 @@ func (s *Server) getDebug(request *restful.Request, response *restful.Response) 
 		return
 	}
 
-	remotecommand.ServeExec(response.ResponseWriter,
+	remotecommand.ServeAttach(response.ResponseWriter,
 		request.Request,
 		s.host,
 		podFullName,
 		params.podUID,
-		containerName,
-		params.cmd,
+		params.containerName,
 		streamOpts,
 		s.host.StreamingConnectionIdleTimeout(),
 		remotecommand.DefaultStreamCreationTimeout,

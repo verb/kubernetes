@@ -62,6 +62,11 @@ import (
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
 )
 
+const (
+	defaultDebugContainerName = "debug"
+	defaultDebugImage         = "debian"
+)
+
 // Get a list of pods that have data directories.
 func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 	podInfos, err := ioutil.ReadDir(kl.getPodsDir())
@@ -1479,26 +1484,46 @@ func (kl *Kubelet) GetExec(podFullName string, podUID types.UID, containerName s
 	}
 }
 
-// GetAttach gets the URL the attach will be served from, or nil if the Kubelet will serve it.
-func (kl *Kubelet) GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommand.Options) (*url.URL, error) {
-	// TODO(verb): Put this some place same...
+func (kl *Kubelet) RunDebugContainer(podFullName string, podUID types.UID, containerName, imageName string, cmd []string) error {
+	pp.Dump("In RunDebugContainer", podFullName, podUID, containerName)
 	pod, found := kl.GetPodByFullName(podFullName)
-	if !found || (string(podUID) != "" && pod.UID != podUID) {
-		return nil, fmt.Errorf("HACK: pod %s not found", podFullName)
+	pp.Dump(pod, found)
+	//if !found || (string(podUID) != "" && pod.UID != podUID) {
+	if !found {
+		return fmt.Errorf("HACK: pod %s not found", podFullName)
 	}
 	pullSecrets, err := kl.getPullSecretsForPod(pod)
 	if err != nil {
 		glog.Errorf("HACK: Unable to get pull secrets for pod %q: %v", format.Pod(pod), err)
-		return nil, err
+		return err
 	}
 
+	if containerName == "" {
+		containerName = defaultDebugContainerName
+	}
+	if imageName == "" {
+		imageName = defaultDebugImage
+	}
+
+	container := &v1.Container{
+		Name:    containerName,
+		Command: cmd,
+		Image:   imageName,
+		Stdin:   true,
+		TTY:     true,
+	}
+
+	// Currently only implemented in docker CRI
 	r := kl.containerRuntime.(kuberuntime.KubeGenericRuntime) // TODO(verb): this obviously won't do
-	if err := r.RunDebugContainer(pod, pullSecrets); err != nil {
-		return nil, fmt.Errorf("HACK: error creating debug container: %v", err)
+	if err := r.RunDebugContainer(pod, container, pullSecrets); err != nil {
+		return fmt.Errorf("HACK: error creating debug container: %v", err)
 	}
-	containerName = "debugshell"
-	time.Sleep(time.Second * 2) // HACK HACK HACK
 
+	return nil
+}
+
+// GetAttach gets the URL the attach will be served from, or nil if the Kubelet will serve it.
+func (kl *Kubelet) GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommand.Options) (*url.URL, error) {
 	switch streamingRuntime := kl.containerRuntime.(type) {
 	case kubecontainer.DirectStreamingRuntime:
 		glog.Infof("HACK: Here I am with a (direct) attach request for %s, %s", podFullName, containerName)

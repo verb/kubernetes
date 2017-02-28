@@ -39,6 +39,9 @@ const (
 	containerTerminationMessagePolicyLabel = "io.kubernetes.container.terminationMessagePolicy"
 	containerPreStopHandlerLabel           = "io.kubernetes.container.preStopHandler"
 	containerPortsLabel                    = "io.kubernetes.container.ports"
+	containerTypeDebug                     = "DEBUG"
+	containerTypeInit                      = "INIT"
+	containerTypeRegular                   = "REGULAR"
 )
 
 type labeledPodSandboxInfo struct {
@@ -95,18 +98,13 @@ func newPodAnnotations(pod *v1.Pod) map[string]string {
 }
 
 // newContainerLabels creates container labels from v1.Container and v1.Pod.
-func newContainerLabels(container *v1.Container, pod *v1.Pod) map[string]string {
+func newContainerLabels(container *v1.Container, pod *v1.Pod, containerType string) map[string]string {
 	labels := map[string]string{}
 	labels[types.KubernetesPodNameLabel] = pod.Name
 	labels[types.KubernetesPodNamespaceLabel] = pod.Namespace
 	labels[types.KubernetesPodUIDLabel] = string(pod.UID)
 	labels[types.KubernetesContainerNameLabel] = container.Name
-	labels[types.KubernetesContainerTypeLabel] = "REGULAR" // TODO(verb): make a constant
-
-	// TODO(verb): prototype hack
-	if container.Name == "debugshell" {
-		labels[types.KubernetesContainerTypeLabel] = "DEBUG" // TODO(verb): make a constant
-	}
+	labels[types.KubernetesContainerTypeLabel] = containerType
 
 	return labels
 }
