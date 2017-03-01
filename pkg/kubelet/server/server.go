@@ -719,7 +719,6 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 // getDebug handles requests to add a debug container to a pod
 func (s *Server) getDebug(request *restful.Request, response *restful.Response) {
 	params := getDebugRequestParams(request)
-	glog.Info("HACK: in getDebug()", pp.Sdump(params))
 
 	// TODO(verb): should this be checked further down the line?
 	if params.imageName == "" {
@@ -850,8 +849,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			http.StatusFound,
 			http.StatusMovedPermanently,
 			http.StatusTemporaryRedirect,
-			http.StatusBadRequest,
-			http.StatusNotFound,
+			//http.StatusBadRequest,
+			//http.StatusNotFound,
 			http.StatusSwitchingProtocols,
 		),
 	).Log()

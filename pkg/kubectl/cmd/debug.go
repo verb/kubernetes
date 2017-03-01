@@ -311,7 +311,8 @@ func (p *DebugOptions) Run() error {
 			Name(pod.Name).
 			Namespace(pod.Namespace).
 			SubResource("debug").
-			Param("container", containerName)
+			Param("container", containerName).
+			Param("image", "debian")
 		req.VersionedParams(&api.PodExecOptions{
 			Container: containerName,
 			Command:   p.Command,
@@ -321,7 +322,7 @@ func (p *DebugOptions) Run() error {
 			TTY:       t.Raw,
 		}, api.ParameterCodec)
 
-		glog.Info(pp.Sdump("POST", req.URL()))
+		glog.Info("POST: ", req.URL())
 		return p.Debugger.Debug("POST", req.URL(), p.Config, p.In, p.Out, p.Err, t.Raw, sizeQueue)
 	}
 

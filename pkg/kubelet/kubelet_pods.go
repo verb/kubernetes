@@ -1387,9 +1387,6 @@ func (kl *Kubelet) findContainer(podFullName string, podUID types.UID, container
 	if err != nil {
 		return nil, err
 	}
-	if containerName == "debugshell" {
-		pp.Dump(pods)
-	}
 	podUID = kl.podManager.TranslatePodUID(podUID)
 	pod := kubecontainer.Pods(pods).FindPod(podFullName, podUID)
 	return pod.FindContainerByName(containerName), nil
@@ -1485,16 +1482,15 @@ func (kl *Kubelet) GetExec(podFullName string, podUID types.UID, containerName s
 }
 
 func (kl *Kubelet) RunDebugContainer(podFullName string, podUID types.UID, containerName, imageName string, cmd []string) error {
-	pp.Dump("In RunDebugContainer", podFullName, podUID, containerName)
 	pod, found := kl.GetPodByFullName(podFullName)
-	pp.Dump(pod, found)
+	// TODO(verb): should podUID be set?
 	//if !found || (string(podUID) != "" && pod.UID != podUID) {
 	if !found {
-		return fmt.Errorf("HACK: pod %s not found", podFullName)
+		return fmt.Errorf("pod %s not found", podFullName)
 	}
 	pullSecrets, err := kl.getPullSecretsForPod(pod)
 	if err != nil {
-		glog.Errorf("HACK: Unable to get pull secrets for pod %q: %v", format.Pod(pod), err)
+		glog.Errorf("Unable to get pull secrets for pod %q: %v", format.Pod(pod), err)
 		return err
 	}
 
@@ -1516,7 +1512,7 @@ func (kl *Kubelet) RunDebugContainer(podFullName string, podUID types.UID, conta
 	// Currently only implemented in docker CRI
 	r := kl.containerRuntime.(kuberuntime.KubeGenericRuntime) // TODO(verb): this obviously won't do
 	if err := r.RunDebugContainer(pod, container, pullSecrets); err != nil {
-		return fmt.Errorf("HACK: error creating debug container: %v", err)
+		return fmt.Errorf("error creating debug container: %v", err)
 	}
 
 	return nil
@@ -1526,36 +1522,28 @@ func (kl *Kubelet) RunDebugContainer(podFullName string, podUID types.UID, conta
 func (kl *Kubelet) GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommand.Options) (*url.URL, error) {
 	switch streamingRuntime := kl.containerRuntime.(type) {
 	case kubecontainer.DirectStreamingRuntime:
-		glog.Infof("HACK: Here I am with a (direct) attach request for %s, %s", podFullName, containerName)
 		// Kubelet will serve the attach directly.
 		return nil, nil
 	case kubecontainer.IndirectStreamingRuntime:
-		glog.Infof("HACK: Here I am with an (indirect) attach request for %s, %s", podFullName, containerName)
 		container, err := kl.findContainer(podFullName, podUID, containerName)
 		if err != nil {
 			return nil, err
 		}
 		if container == nil {
+			// Allow connecting to Debug Containers in addition to those in pod spec
 			return nil, fmt.Errorf("container %s not found in pod %s", containerName, podFullName)
 		}
 
-		pp.Dump("Found container", container)
-		var tty bool
-		if containerName != "debugshell" {
-			// The TTY setting for attach must match the TTY setting in the initial container configuration,
-			// since whether the process is running in a TTY cannot be changed after it has started.  We
-			// need the api.Pod to get the TTY status.
-			pod, found := kl.GetPodByFullName(podFullName)
-			if !found || (string(podUID) != "" && pod.UID != podUID) {
-				return nil, fmt.Errorf("pod %s not found", podFullName)
-			}
-			containerSpec := kubecontainer.GetContainerSpec(pod, containerName)
-			if containerSpec == nil {
-				return nil, fmt.Errorf("container %s not found in pod %s", containerName, podFullName)
-			}
+		// The TTY setting for attach must match the TTY setting in the initial container configuration,
+		// since whether the process is running in a TTY cannot be changed after it has started.  We
+		// need the api.Pod to get the TTY status.
+		tty := streamOpts.TTY
+		pod, found := kl.GetPodByFullName(podFullName)
+		if !found || (string(podUID) != "" && pod.UID != podUID) {
+			return nil, fmt.Errorf("pod %s not found", podFullName)
+		}
+		if containerSpec := kubecontainer.GetContainerSpec(pod, containerName); containerSpec != nil {
 			tty = containerSpec.TTY
-		} else {
-			tty = true
 		}
 
 		return streamingRuntime.GetAttach(container.ID, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, tty)

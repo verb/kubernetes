@@ -92,7 +92,6 @@ func (ds *dockerService) ListContainers(filter *runtimeapi.ContainerFilter) ([]*
 // symlink at LogPath, linking to the actual path of the log.
 // TODO: check if the default values returned by the runtime API are ok.
 func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
-	pp.Dump("dockershim.CreateContainer", config, sandboxConfig)
 	if config == nil {
 		return "", fmt.Errorf("container config is nil")
 	}
@@ -135,24 +134,19 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 		},
 	}
 
-	// Fill the HostConfig.
+	// Fill the HostsnConfig.
 	hc := &dockercontainer.HostConfig{
 		Binds: generateMountBindings(config.GetMounts()),
 	}
 	// Add cross-container mounts
-	// TODO: terrible hack
-	if config.Metadata.Name == "debugshell" {
-		glog.Info("Found a debug container")
-		if cs, err := ds.ListContainers(&runtimeapi.ContainerFilter{PodSandboxId: podSandboxID}); err == nil {
-			pp.Dump(cs)
-			for _, c := range cs {
-				path, _ := ds.getContainerImagePath(c.Id)
-				if err != nil {
-					continue
-				}
-				hc.Binds = append(hc.Binds, fmt.Sprintf("%s:/%s/%s", path, "c", c.Metadata.Name)) // TODO: mountpath as constant
-				pp.Dump(path, hc.Binds)
+	// TODO: probably a better place for this
+	for _, m := range config.GetMounts() {
+		if m.ContainerRoot != "" {
+			path, err := ds.getContainerImagePath(m.ContainerRoot)
+			if err != nil {
+				continue
 			}
+			hc.Binds = append(hc.Binds, fmt.Sprintf("%s:%s:ro", path, m.ContainerPath)) //TODO: better read only
 		}
 	}
 
@@ -207,7 +201,6 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 	}
 	hc.SecurityOpt = append(hc.SecurityOpt, securityOpts...)
 
-	pp.Dump(hc)
 	createConfig.HostConfig = hc
 	createResp, err := ds.client.CreateContainer(createConfig)
 	if err != nil {
@@ -236,7 +229,6 @@ func (ds *dockerService) getContainerImagePath(containerID string) (string, erro
 	if err != nil {
 		return "", fmt.Errorf("failed to inspect container %q: %v", containerID, err)
 	}
-	pp.Dump(info)
 	// TODO: handle case where GraphDriver doesn't exist (maybe Data will always exist, though)
 	if info.GraphDriver.Name == "overlay" {
 		return info.GraphDriver.Data["MergedDir"], nil

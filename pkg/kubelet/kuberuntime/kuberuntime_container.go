@@ -72,7 +72,7 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 		restartCount = containerStatus.RestartCount + 1
 	}
 
-	containerConfig, err := m.generateContainerConfig(container, pod, restartCount, podIP, imageRef, containerType)
+	containerConfig, err := m.generateContainerConfig(container, pod, restartCount, podIP, imageRef, containerType, podStatus)
 	if err != nil {
 		m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedToCreateContainer, "Failed to create container with error: %v", err)
 		return "Generate Container Config Failed", err
@@ -131,7 +131,7 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 }
 
 // generateContainerConfig generates container config for kubelet runtime v1.
-func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Container, pod *v1.Pod, restartCount int, podIP, imageRef, containerType string) (*runtimeapi.ContainerConfig, error) {
+func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Container, pod *v1.Pod, restartCount int, podIP, imageRef, containerType string, podStatus *kubecontainer.PodStatus) (*runtimeapi.ContainerConfig, error) {
 	opts, err := m.runtimeHelper.GenerateRunContainerOptions(pod, container, podIP)
 	if err != nil {
 		return nil, err
@@ -183,6 +183,18 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 		}
 	}
 	config.Envs = envs
+
+	if containerType == containerTypeDebug {
+		for _, c := range podStatus.ContainerStatuses {
+			if c.Type == containerTypeRegular {
+				config.Mounts = append(config.Mounts, &runtimeapi.Mount{
+					ContainerPath: fmt.Sprintf("/%s/%s", "c", c.Name), // TODO: mountpath as constant
+					ContainerRoot: c.ID.ID,                            // TODO(verb): not entirely sure this is the right ID
+					Readonly:      true,
+				})
+			}
+		}
+	}
 
 	return config, nil
 }
@@ -733,22 +745,20 @@ func (m *kubeGenericRuntimeManager) RunInContainer(id kubecontainer.ContainerID,
 
 // TODO(verb)
 func (m *kubeGenericRuntimeManager) RunDebugContainer(pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret) error {
-	glog.Info("HACK: Running debug container in pod", *pod)
 	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	if err != nil {
-		return fmt.Errorf("HACK: %v", err)
+		return err
 	}
 
 	podSandboxConfig, err := m.generatePodSandboxConfig(pod, 0)
 	if err != nil {
-		return fmt.Errorf("HACK: %v", err)
+		return err
 	}
 
 	if _, err := m.startContainer(podStatus.SandboxStatuses[0].Id, podSandboxConfig, container, pod, podStatus, pullSecrets, podStatus.IP, containerTypeDebug); err != nil {
-		return fmt.Errorf("HACK: an error, unsurprisingly: %v", err)
+		return err
 	}
 
-	glog.Info("HACK: I guess RunDebugContainer worked...")
 	return nil
 }
 

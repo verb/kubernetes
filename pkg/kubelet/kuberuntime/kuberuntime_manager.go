@@ -514,7 +514,6 @@ func (m *kubeGenericRuntimeManager) computePodContainerChanges(pod *v1.Pod, podS
 	runningContainerStatuses := podStatus.GetRunningContainerStatuses()
 	for _, containerStatus := range runningContainerStatuses {
 		// Debug Containers should never be killed by SyncPod()
-		glog.Infof("HACK: Name,Type is %q,%q", containerStatus.Name, containerStatus.Type)
 		// TODO(verb): make it a constant
 		if containerStatus.Type == "DEBUG" {
 			continue
