@@ -2132,6 +2132,11 @@ type PodStatus struct {
 	// when we have done this.
 	// +optional
 	ContainerStatuses []ContainerStatus
+	// The list has one entry per init container in the manifest. The most recent successful
+	// init container will have ready = true, the most recently started container will have
+	// startTime set.
+	// More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses
+	DebugContainerStatuses []ContainerStatus
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded

@@ -2455,6 +2455,15 @@ func DeepCopy_v1_PodStatus(in interface{}, out interface{}, c *conversion.Cloner
 				}
 			}
 		}
+		if in.DebugContainerStatuses != nil {
+			in, out := &in.DebugContainerStatuses, &out.DebugContainerStatuses
+			*out = make([]ContainerStatus, len(*in))
+			for i := range *in {
+				if err := DeepCopy_v1_ContainerStatus(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		}
 		return nil
 	}
 }

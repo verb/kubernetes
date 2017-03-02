@@ -6739,6 +6739,19 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								},
 							},
 						},
+						"debugContainerStatuses": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The list has one entry for every debug container that's been attached to this pod. Each entry is currently the output of `docker inspect`. More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/api/v1.ContainerStatus"),
+										},
+									},
+								},
+							},
+						},
 						"qosClass": {
 							SchemaProps: spec.SchemaProps{
 								Description: "The Quality of Service (QOS) classification assigned to the pod based on resource requirements See PodQOSClass type for available QOS classes More info: https://github.com/kubernetes/kubernetes/blob/master/docs/design/resource-qos.md",

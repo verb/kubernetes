@@ -38329,6 +38329,13 @@
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ContainerStatus"
       }
      },
+     "debugContainerStatuses": {
+      "description": "The list has one entry for every debug container that's been attached to this pod. Each entry is currently the output of `docker inspect`. More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ContainerStatus"
+      }
+     },
      "hostIP": {
       "description": "IP address of the host to which the pod is assigned. Empty if not yet scheduled.",
       "type": "string"

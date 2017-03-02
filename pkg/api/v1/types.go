@@ -2398,6 +2398,12 @@ type PodStatus struct {
 	// More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses
 	// +optional
 	ContainerStatuses []ContainerStatus `json:"containerStatuses,omitempty" protobuf:"bytes,8,rep,name=containerStatuses"`
+
+	// The list has one entry for every debug container that's been attached to this pod.
+	// Each entry is currently the output of `docker inspect`.
+	// More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses
+	DebugContainerStatuses []ContainerStatus `json:"debugContainerStatuses,omitempty" protobuf:"bytes,11,rep,name=debugContainerStatuses"`
+
 	// The Quality of Service (QOS) classification assigned to the pod based on resource requirements
 	// See PodQOSClass type for available QOS classes
 	// More info: https://github.com/kubernetes/kubernetes/blob/master/docs/design/resource-qos.md
