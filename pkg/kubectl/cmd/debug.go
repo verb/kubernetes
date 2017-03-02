@@ -51,8 +51,9 @@ var (
 )
 
 const (
-	debugUsageStr      = "expected 'debug POD_NAME COMMAND [ARG1] [ARG2] ... [ARGN]'.\nPOD_NAME and COMMAND are required arguments for the debug command"
-	debugContainerName = "debugshell"
+	debugUsageStr             = "expected 'debug POD_NAME COMMAND [ARG1] [ARG2] ... [ARGN]'.\nPOD_NAME and COMMAND are required arguments for the debug command"
+	debugDefaultContainerName = "debug"
+	debugDefaultImageName     = "debian"
 )
 
 func NewCmdDebug(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
@@ -79,7 +80,8 @@ func NewCmdDebug(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *
 	}
 	cmd.Flags().StringVarP(&options.PodName, "pod", "p", "", "Pod name")
 	// TODO support UID
-	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", "", "Container name. If omitted, the first container in the pod will be chosen")
+	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", "", fmt.Sprintf("Container name. [default=%s]", debugDefaultContainerName))
+	cmd.Flags().StringVarP(&options.ImageName, "image", "m", "", fmt.Sprintf("Image name. [default=%s]", debugDefaultImageName))
 	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", false, "Pass stdin to the container")
 	cmd.Flags().BoolVarP(&options.TTY, "tty", "t", false, "Stdin is a TTY")
 	return cmd
@@ -132,6 +134,7 @@ type StreamOptions struct {
 // DebugOptions declare the arguments accepted by the Debug command
 type DebugOptions struct {
 	StreamOptions
+	ImageName string
 
 	Command []string
 
@@ -278,12 +281,22 @@ func (p *DebugOptions) Run() error {
 
 	containerName := p.ContainerName
 	if len(containerName) == 0 {
-		usageString := fmt.Sprintf("Defaulting container name to %s.", debugContainerName)
+		usageString := fmt.Sprintf("Defaulting container name to %s.", debugDefaultContainerName)
 		if len(p.SuggestedCmdUsage) > 0 {
 			usageString = fmt.Sprintf("%s\n%s", usageString, p.SuggestedCmdUsage)
 		}
 		fmt.Fprintf(p.Err, "%s\n", usageString)
-		containerName = debugContainerName
+		containerName = debugDefaultContainerName
+	}
+
+	imageName := p.ImageName
+	if len(imageName) == 0 {
+		usageString := fmt.Sprintf("Defaulting image name to %s.", debugDefaultImageName)
+		if len(p.SuggestedCmdUsage) > 0 {
+			usageString = fmt.Sprintf("%s\n%s", usageString, p.SuggestedCmdUsage)
+		}
+		fmt.Fprintf(p.Err, "%s\n", usageString)
+		imageName = debugDefaultImageName
 	}
 
 	// ensure we can recover the terminal while attached
@@ -312,7 +325,7 @@ func (p *DebugOptions) Run() error {
 			Namespace(pod.Namespace).
 			SubResource("debug").
 			Param("container", containerName).
-			Param("image", "debian")
+			Param("image", imageName)
 		req.VersionedParams(&api.PodExecOptions{
 			Container: containerName,
 			Command:   p.Command,
@@ -327,7 +340,6 @@ func (p *DebugOptions) Run() error {
 	}
 
 	if err := t.Safe(fn); err != nil {
-		glog.Info(pp.Sdump(err))
 		return err
 	}
 
