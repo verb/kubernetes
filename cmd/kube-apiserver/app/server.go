@@ -324,7 +324,7 @@ func Run(s *options.ServerRunOptions) error {
 	genericConfig.EnableMetrics = true
 	genericConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(
 		sets.NewString("watch", "proxy"),
-		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
+		sets.NewString("attach", "debug", "exec", "proxy", "log", "portforward"),
 	)
 
 	if err := s.Etcd.ApplyWithStorageFactoryTo(storageFactory, genericConfig); err != nil {

@@ -2132,6 +2132,11 @@ type PodStatus struct {
 	// when we have done this.
 	// +optional
 	ContainerStatuses []ContainerStatus
+	// The list has one entry per init container in the manifest. The most recent successful
+	// init container will have ready = true, the most recently started container will have
+	// startTime set.
+	// More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses
+	DebugContainerStatuses []ContainerStatus
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
@@ -3105,6 +3110,32 @@ type PodExecOptions struct {
 	Command []string
 }
 
+// PodDebugOptions TODO(verb)
+type PodDebugOptions struct {
+	metav1.TypeMeta
+
+	// Stdin if true indicates that stdin is to be redirected for the exec call
+	Stdin bool
+
+	// Stdout if true indicates that stdout is to be redirected for the exec call
+	Stdout bool
+
+	// Stderr if true indicates that stderr is to be redirected for the exec call
+	Stderr bool
+
+	// TTY if true indicates that a tty will be allocated for the exec call
+	TTY bool
+
+	// Container in which to execute the command.
+	Container string
+
+	// Command is the remote command to execute; argv array; not executed within a shell.
+	Command []string
+
+	// TODO(verb)
+	Image string
+}
+
 // PodPortForwardOptions is the query options to a Pod's port forward call
 type PodPortForwardOptions struct {
 	metav1.TypeMeta
@@ -3573,7 +3604,7 @@ const (
 	// Enable TTY for remote command execution
 	ExecTTYParam = "tty"
 	// Command to run for remote command execution
-	ExecCommandParamm = "command"
+	ExecCommandParam = "command"
 
 	// Name of header that specifies stream type
 	StreamType = "streamType"
@@ -3595,6 +3626,9 @@ const (
 	// Name of header that specifies a request ID used to associate the error
 	// and data streams for a single forwarded connection
 	PortForwardRequestIDHeader = "requestID"
+
+	// Command to run for remote debug image
+	DebugImageParam = "image"
 )
 
 // Type and constants for component health validation.

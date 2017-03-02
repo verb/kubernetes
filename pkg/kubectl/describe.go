@@ -569,6 +569,9 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 		if len(pod.Spec.InitContainers) > 0 {
 			describeContainers("Init Containers", pod.Spec.InitContainers, pod.Status.InitContainerStatuses, EnvValueRetriever(pod), w, "")
 		}
+		if len(pod.Status.DebugContainerStatuses) > 0 {
+			describeContainersFromStatus("Debug Containers", pod.Status.DebugContainerStatuses, EnvValueRetriever(pod), w, "")
+		}
 		describeContainers("Containers", pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(pod), w, "")
 		if len(pod.Status.Conditions) > 0 {
 			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\n")
@@ -916,6 +919,26 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 
 		return nil
 	})
+}
+
+func describeContainersFromStatus(label string, containerStatuses []api.ContainerStatus,
+	resolverFn EnvVarResolverFunc, w *PrefixWriter, space string) {
+
+	if len(containerStatuses) > 0 {
+		w.Write(LEVEL_0, "%s%s:\n", space, label)
+	}
+
+	for _, status := range containerStatuses {
+		nameIndent := ""
+		if len(space) > 0 {
+			nameIndent = " "
+		}
+		w.Write(LEVEL_1, "%s%v:\n", nameIndent, status.Name)
+		w.Write(LEVEL_2, "Container ID:\t%s\n", status.ContainerID)
+		w.Write(LEVEL_2, "Image:\t%s\n", status.Image)
+		w.Write(LEVEL_2, "Image ID:\t%s\n", status.ImageID)
+		describeContainerState(status, w)
+	}
 }
 
 func describeContainers(label string, containers []api.Container, containerStatuses []api.ContainerStatus,

@@ -49,6 +49,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
@@ -59,6 +60,11 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
+)
+
+const (
+	defaultDebugContainerName = "debug"
+	defaultDebugImage         = "debian"
 )
 
 // Get a list of pods that have data directories.
@@ -1227,7 +1233,56 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 		true,
 	)
 
+	// TODO(verb): this whole method should be replaced with a single loop through podStatus.ContainerStatuses
+	//             This is just a kludge for the pod troubleshooting prototype.
+	conv := kl.statusConverter()
+	statuses, seen := []v1.ContainerStatus{}, map[string]bool{}
+	sort.Sort(sort.Reverse(kubecontainer.SortContainerStatusesByCreationTime(podStatus.ContainerStatuses)))
+	for _, c := range podStatus.ContainerStatuses {
+		if c.Type == "DEBUG" && !seen[c.Name] {
+			statuses = append(statuses, *conv(c))
+		}
+	}
+	apiPodStatus.DebugContainerStatuses = statuses
+
 	return &apiPodStatus
+}
+
+func (kl *Kubelet) statusConverter() func(cs *kubecontainer.ContainerStatus) *v1.ContainerStatus {
+	// TODO(verb): add LastTerminatedState
+	return func(cs *kubecontainer.ContainerStatus) *v1.ContainerStatus {
+		cid := cs.ID.String()
+		status := &v1.ContainerStatus{
+			Name:         cs.Name,
+			RestartCount: int32(cs.RestartCount),
+			Image:        cs.Image,
+			ImageID:      cs.ImageID,
+			ContainerID:  cid,
+		}
+		switch cs.State {
+		case kubecontainer.ContainerStateRunning:
+			status.State.Running = &v1.ContainerStateRunning{StartedAt: metav1.NewTime(cs.StartedAt)}
+		case kubecontainer.ContainerStateCreated:
+			// Treat containers in the "created" state as if they are exited.
+			// The pod workers are supposed start all containers it creates in
+			// one sync (syncPod) iteration. There should not be any normal
+			// "created" containers when the pod worker generates the status at
+			// the beginning of a sync iteration.
+			fallthrough
+		case kubecontainer.ContainerStateExited:
+			status.State.Terminated = &v1.ContainerStateTerminated{
+				ExitCode:    int32(cs.ExitCode),
+				Reason:      cs.Reason,
+				Message:     cs.Message,
+				StartedAt:   metav1.NewTime(cs.StartedAt),
+				FinishedAt:  metav1.NewTime(cs.FinishedAt),
+				ContainerID: cid,
+			}
+		default:
+			status.State.Waiting = &v1.ContainerStateWaiting{}
+		}
+		return status
+	}
 }
 
 // convertToAPIContainerStatuses converts the given internal container
@@ -1475,6 +1530,43 @@ func (kl *Kubelet) GetExec(podFullName string, podUID types.UID, containerName s
 	}
 }
 
+func (kl *Kubelet) RunDebugContainer(podFullName string, podUID types.UID, containerName, imageName string, cmd []string) error {
+	pod, found := kl.GetPodByFullName(podFullName)
+	// TODO(verb): should podUID be set?
+	//if !found || (string(podUID) != "" && pod.UID != podUID) {
+	if !found {
+		return fmt.Errorf("pod %s not found", podFullName)
+	}
+	pullSecrets, err := kl.getPullSecretsForPod(pod)
+	if err != nil {
+		glog.Errorf("Unable to get pull secrets for pod %q: %v", format.Pod(pod), err)
+		return err
+	}
+
+	if containerName == "" {
+		containerName = defaultDebugContainerName
+	}
+	if imageName == "" {
+		imageName = defaultDebugImage
+	}
+
+	container := &v1.Container{
+		Name:    containerName,
+		Command: cmd,
+		Image:   imageName,
+		Stdin:   true,
+		TTY:     true,
+	}
+
+	// Currently only implemented in docker CRI
+	r := kl.containerRuntime.(kuberuntime.KubeGenericRuntime) // TODO(verb): this obviously won't do
+	if err := r.RunDebugContainer(pod, container, pullSecrets); err != nil {
+		return fmt.Errorf("error creating debug container: %v", err)
+	}
+
+	return nil
+}
+
 // GetAttach gets the URL the attach will be served from, or nil if the Kubelet will serve it.
 func (kl *Kubelet) GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommand.Options) (*url.URL, error) {
 	switch streamingRuntime := kl.containerRuntime.(type) {
@@ -1487,21 +1579,21 @@ func (kl *Kubelet) GetAttach(podFullName string, podUID types.UID, containerName
 			return nil, err
 		}
 		if container == nil {
+			// Allow connecting to Debug Containers in addition to those in pod spec
 			return nil, fmt.Errorf("container %s not found in pod %s", containerName, podFullName)
 		}
 
 		// The TTY setting for attach must match the TTY setting in the initial container configuration,
 		// since whether the process is running in a TTY cannot be changed after it has started.  We
 		// need the api.Pod to get the TTY status.
+		tty := streamOpts.TTY
 		pod, found := kl.GetPodByFullName(podFullName)
 		if !found || (string(podUID) != "" && pod.UID != podUID) {
 			return nil, fmt.Errorf("pod %s not found", podFullName)
 		}
-		containerSpec := kubecontainer.GetContainerSpec(pod, containerName)
-		if containerSpec == nil {
-			return nil, fmt.Errorf("container %s not found in pod %s", containerName, podFullName)
+		if containerSpec := kubecontainer.GetContainerSpec(pod, containerName); containerSpec != nil {
+			tty = containerSpec.TTY
 		}
-		tty := containerSpec.TTY
 
 		return streamingRuntime.GetAttach(container.ID, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, tty)
 	default:

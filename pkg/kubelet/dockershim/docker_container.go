@@ -134,9 +134,20 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 		},
 	}
 
-	// Fill the HostConfig.
+	// Fill the HostsnConfig.
 	hc := &dockercontainer.HostConfig{
 		Binds: generateMountBindings(config.GetMounts()),
+	}
+	// Add cross-container mounts
+	// TODO: probably a better place for this
+	for _, m := range config.GetMounts() {
+		if m.ContainerRoot != "" {
+			path, err := ds.getContainerImagePath(m.ContainerRoot)
+			if err != nil {
+				continue
+			}
+			hc.Binds = append(hc.Binds, fmt.Sprintf("%s:%s:ro", path, m.ContainerPath)) //TODO: better read only
+		}
 	}
 
 	// Apply Linux-specific options if applicable.
@@ -210,6 +221,19 @@ func (ds *dockerService) getContainerLogPath(containerID string) (string, string
 		return "", "", fmt.Errorf("failed to inspect container %q: %v", containerID, err)
 	}
 	return info.Config.Labels[containerLogPathLabelKey], info.LogPath, nil
+}
+
+// TODO: hack
+func (ds *dockerService) getContainerImagePath(containerID string) (string, error) {
+	info, err := ds.client.InspectContainer(containerID)
+	if err != nil {
+		return "", fmt.Errorf("failed to inspect container %q: %v", containerID, err)
+	}
+	// TODO: handle case where GraphDriver doesn't exist (maybe Data will always exist, though)
+	if info.GraphDriver.Name == "overlay" {
+		return info.GraphDriver.Data["MergedDir"], nil
+	}
+	return "", nil
 }
 
 // createContainerLogSymlink creates the symlink for docker container log.

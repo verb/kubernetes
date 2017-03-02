@@ -115,6 +115,9 @@ func extractLabels(input map[string]string) (map[string]string, map[string]strin
 // relabeling and the pod provides an SELinux label
 func generateMountBindings(mounts []*runtimeapi.Mount) (result []string) {
 	for _, m := range mounts {
+		if m.HostPath == "" || m.ContainerPath == "" {
+			continue
+		}
 		bind := fmt.Sprintf("%s:%s", m.HostPath, m.ContainerPath)
 		readOnly := m.Readonly
 		if readOnly {

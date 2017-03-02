@@ -51,7 +51,7 @@ import (
 // * create the container
 // * start the container
 // * run the post start lifecycle hooks (if applicable)
-func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandboxConfig *runtimeapi.PodSandboxConfig, container *v1.Container, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, podIP string) (string, error) {
+func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandboxConfig *runtimeapi.PodSandboxConfig, container *v1.Container, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, podIP, containerType string) (string, error) {
 	// Step 1: pull the image.
 	imageRef, msg, err := m.imagePuller.EnsureImageExists(pod, container, pullSecrets)
 	if err != nil {
@@ -72,7 +72,7 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 		restartCount = containerStatus.RestartCount + 1
 	}
 
-	containerConfig, err := m.generateContainerConfig(container, pod, restartCount, podIP, imageRef)
+	containerConfig, err := m.generateContainerConfig(container, pod, restartCount, podIP, imageRef, containerType, podStatus)
 	if err != nil {
 		m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedToCreateContainer, "Failed to create container with error: %v", err)
 		return "Generate Container Config Failed", err
@@ -131,7 +131,7 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 }
 
 // generateContainerConfig generates container config for kubelet runtime v1.
-func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Container, pod *v1.Pod, restartCount int, podIP, imageRef string) (*runtimeapi.ContainerConfig, error) {
+func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Container, pod *v1.Pod, restartCount int, podIP, imageRef, containerType string, podStatus *kubecontainer.PodStatus) (*runtimeapi.ContainerConfig, error) {
 	opts, err := m.runtimeHelper.GenerateRunContainerOptions(pod, container, podIP)
 	if err != nil {
 		return nil, err
@@ -162,7 +162,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 		Command:     command,
 		Args:        args,
 		WorkingDir:  container.WorkingDir,
-		Labels:      newContainerLabels(container, pod),
+		Labels:      newContainerLabels(container, pod, containerType),
 		Annotations: newContainerAnnotations(container, pod, restartCount),
 		Devices:     makeDevices(opts),
 		Mounts:      m.makeMounts(opts, container),
@@ -183,6 +183,18 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 		}
 	}
 	config.Envs = envs
+
+	if containerType == containerTypeDebug {
+		for _, c := range podStatus.ContainerStatuses {
+			if c.Type == containerTypeRegular {
+				config.Mounts = append(config.Mounts, &runtimeapi.Mount{
+					ContainerPath: fmt.Sprintf("/%s/%s", "c", c.Name), // TODO: mountpath as constant
+					ContainerRoot: c.ID.ID,                            // TODO(verb): not entirely sure this is the right ID
+					Readonly:      true,
+				})
+			}
+		}
+	}
 
 	return config, nil
 }
@@ -394,6 +406,7 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 				ID:   c.Id,
 			},
 			Name:         labeledInfo.ContainerName,
+			Type:         labeledInfo.ContainerType,
 			Image:        status.Image.Image,
 			ImageID:      status.ImageRef,
 			Hash:         annotatedInfo.Hash,
@@ -728,6 +741,25 @@ func (m *kubeGenericRuntimeManager) RunInContainer(id kubecontainer.ContainerID,
 	// for logging purposes. A combined output option will need to be added to the ExecSyncRequest
 	// if more precise output ordering is ever required.
 	return append(stdout, stderr...), err
+}
+
+// TODO(verb)
+func (m *kubeGenericRuntimeManager) RunDebugContainer(pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret) error {
+	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	if err != nil {
+		return err
+	}
+
+	podSandboxConfig, err := m.generatePodSandboxConfig(pod, 0)
+	if err != nil {
+		return err
+	}
+
+	if _, err := m.startContainer(podStatus.SandboxStatuses[0].Id, podSandboxConfig, container, pod, podStatus, pullSecrets, podStatus.IP, containerTypeDebug); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // removeContainer removes the container and the container logs.

@@ -148,6 +148,8 @@ message Mount {
     bool readonly = 3;
     // If set, the mount needs SELinux relabeling.
     bool selinux_relabel = 4;
+    // Mount the root of another container instead of host_path
+    string container_root = 5;
 }
 
 // NamespaceOption provides options for Linux namespaces.

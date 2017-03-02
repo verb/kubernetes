@@ -3439,6 +3439,122 @@
      }
     ]
    },
+   "/api/v1/namespaces/{namespace}/pods/{name}/debug": {
+    "get": {
+     "description": "connect GET requests to debug of Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "connectCoreV1GetNamespacedPodDebug",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "post": {
+     "description": "connect POST requests to debug of Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "connectCoreV1PostNamespacedPodDebug",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "name": "command",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "name": "container",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "name": "image",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the Pod",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "name": "stderr",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "name": "stdin",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "name": "stdout",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "name": "tty",
+      "in": "query"
+     }
+    ]
+   },
    "/api/v1/namespaces/{namespace}/pods/{name}/eviction": {
     "post": {
      "description": "create eviction of an Eviction",
@@ -38208,6 +38324,13 @@
      },
      "containerStatuses": {
       "description": "The list has one entry per container in the manifest. Each entry is currently the output of `docker inspect`. More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ContainerStatus"
+      }
+     },
+     "debugContainerStatuses": {
+      "description": "The list has one entry for every debug container that's been attached to this pod. Each entry is currently the output of `docker inspect`. More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ContainerStatus"

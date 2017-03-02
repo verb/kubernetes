@@ -2398,6 +2398,12 @@ type PodStatus struct {
 	// More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses
 	// +optional
 	ContainerStatuses []ContainerStatus `json:"containerStatuses,omitempty" protobuf:"bytes,8,rep,name=containerStatuses"`
+
+	// The list has one entry for every debug container that's been attached to this pod.
+	// Each entry is currently the output of `docker inspect`.
+	// More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses
+	DebugContainerStatuses []ContainerStatus `json:"debugContainerStatuses,omitempty" protobuf:"bytes,11,rep,name=debugContainerStatuses"`
+
 	// The Quality of Service (QOS) classification assigned to the pod based on resource requirements
 	// See PodQOSClass type for available QOS classes
 	// More info: https://github.com/kubernetes/kubernetes/blob/master/docs/design/resource-qos.md
@@ -3576,6 +3582,45 @@ type PodExecOptions struct {
 
 	// Command is the remote command to execute. argv array. Not executed within a shell.
 	Command []string `json:"command" protobuf:"bytes,6,rep,name=command"`
+}
+
+// PodDebugOptions TODO(verb)
+// ---
+// TODO: This is largely identical to PodAttachOptions above, make sure they stay in sync and see about merging
+// and also when we cut V2, we should export a "StreamOptions" or somesuch that contains Stdin, Stdout, Stder and TTY
+type PodDebugOptions struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// Redirect the standard input stream of the pod for this call.
+	// Defaults to false.
+	// +optional
+	Stdin bool `json:"stdin,omitempty" protobuf:"varint,1,opt,name=stdin"`
+
+	// Redirect the standard output stream of the pod for this call.
+	// Defaults to true.
+	// +optional
+	Stdout bool `json:"stdout,omitempty" protobuf:"varint,2,opt,name=stdout"`
+
+	// Redirect the standard error stream of the pod for this call.
+	// Defaults to true.
+	// +optional
+	Stderr bool `json:"stderr,omitempty" protobuf:"varint,3,opt,name=stderr"`
+
+	// TTY if true indicates that a tty will be allocated for the exec call.
+	// Defaults to false.
+	// +optional
+	TTY bool `json:"tty,omitempty" protobuf:"varint,4,opt,name=tty"`
+
+	// Container in which to execute the command.
+	// Defaults to only container if there is only one container in the pod.
+	// +optional
+	Container string `json:"container,omitempty" protobuf:"bytes,5,opt,name=container"`
+
+	// Command is the remote command to execute. argv array. Not executed within a shell.
+	Command []string `json:"command" protobuf:"bytes,6,rep,name=command"`
+
+	// TODO(verb)
+	Image string `json:"image" protobuf:"bytes,7,opt,name=image"`
 }
 
 // PodPortForwardOptions is the query options to a Pod's port forward call

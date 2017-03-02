@@ -52,6 +52,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 				"PodLogOptions",
 				"PodExecOptions",
 				"PodAttachOptions",
+				"PodDebugOptions",
 				"PodPortForwardOptions",
 				"PodProxyOptions",
 				"NodeProxyOptions",

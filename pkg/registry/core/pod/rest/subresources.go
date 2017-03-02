@@ -195,3 +195,40 @@ func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.Roun
 	handler.MaxBytesPerSec = capabilities.Get().PerConnectionBandwidthLimitBytesPerSec
 	return handler
 }
+
+// DebugREST implements the debug subresource for a Pod
+type DebugREST struct {
+	Store       *genericregistry.Store
+	KubeletConn client.ConnectionInfoGetter
+}
+
+// Implement Connecter
+var _ = rest.Connecter(&DebugREST{})
+
+// New creates a new Pod object
+func (r *DebugREST) New() runtime.Object {
+	return &api.Pod{}
+}
+
+// Connect returns a handler for the pod exec proxy
+func (r *DebugREST) Connect(ctx genericapirequest.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
+	debugOpts, ok := opts.(*api.PodDebugOptions)
+	if !ok {
+		return nil, fmt.Errorf("invalid options object: %#v", opts)
+	}
+	location, transport, err := pod.DebugLocation(r.Store, r.KubeletConn, ctx, name, debugOpts)
+	if err != nil {
+		return nil, err
+	}
+	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, true, responder), nil
+}
+
+// NewConnectOptions returns the versioned object that represents exec parameters
+func (r *DebugREST) NewConnectOptions() (runtime.Object, bool, string) {
+	return &api.PodDebugOptions{}, false, ""
+}
+
+// ConnectMethods returns the methods supported by exec
+func (r *DebugREST) ConnectMethods() []string {
+	return upgradeableMethods
+}
