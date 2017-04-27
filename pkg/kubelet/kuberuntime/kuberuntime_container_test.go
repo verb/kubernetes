@@ -221,7 +221,7 @@ func makeExpetectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerIn
 		Command:     container.Command,
 		Args:        []string(nil),
 		WorkingDir:  container.WorkingDir,
-		Labels:      newContainerLabels(container, pod),
+		Labels:      newContainerLabels(container, pod, kubecontainer.ContainerTypeRegular),
 		Annotations: newContainerAnnotations(container, pod, restartCount),
 		Devices:     makeDevices(opts),
 		Mounts:      m.makeMounts(opts, container),
@@ -259,7 +259,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 	}
 
 	expectedConfig := makeExpetectedConfig(m, pod, 0)
-	containerConfig, err := m.generateContainerConfig(&pod.Spec.Containers[0], pod, 0, "", pod.Spec.Containers[0].Image)
+	containerConfig, err := m.generateContainerConfig(&pod.Spec.Containers[0], pod, 0, "", pod.Spec.Containers[0].Image, kubecontainer.ContainerTypeRegular)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedConfig, containerConfig, "generate container config for kubelet runtime v1.")
 
@@ -288,7 +288,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 		},
 	}
 
-	_, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image)
+	_, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, kubecontainer.ContainerTypeRegular)
 	assert.Error(t, err)
 }
 
