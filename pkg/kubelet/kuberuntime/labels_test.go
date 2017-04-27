@@ -68,10 +68,11 @@ func TestContainerLabels(t *testing.T) {
 		PodNamespace:  pod.Namespace,
 		PodUID:        pod.UID,
 		ContainerName: container.Name,
+		ContainerType: containerTypeRegular,
 	}
 
 	// Test whether we can get right information from label
-	labels := newContainerLabels(container, pod)
+	labels := newContainerLabels(container, pod, containerTypeRegular)
 	containerInfo := getContainerInfoFromLabels(labels)
 	if !reflect.DeepEqual(containerInfo, expected) {
 		t.Errorf("expected %v, got %v", expected, containerInfo)
