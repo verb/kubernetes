@@ -46,6 +46,10 @@ func SetDefaults_PodAttachOptions(obj *PodAttachOptions) {
 	obj.Stdout = true
 	obj.Stderr = true
 }
+func SetDefaults_PodDebugOptions(obj *PodDebugOptions) {
+	obj.Stdout = true
+	obj.Stderr = true
+}
 func SetDefaults_ReplicationController(obj *ReplicationController) {
 	var labels map[string]string
 	if obj.Spec.Template != nil {

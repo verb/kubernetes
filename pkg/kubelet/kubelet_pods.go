@@ -1246,7 +1246,56 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 		true,
 	)
 
+	// TODO(verb): this whole method should be replaced with a single loop through podStatus.ContainerStatuses
+	//             This is just a kludge for the pod troubleshooting prototype.
+	conv := kl.statusConverter()
+	statuses, seen := []v1.ContainerStatus{}, map[string]bool{}
+	sort.Sort(sort.Reverse(kubecontainer.SortContainerStatusesByCreationTime(podStatus.ContainerStatuses)))
+	for _, c := range podStatus.ContainerStatuses {
+		if c.Type == "DEBUG" && !seen[c.Name] {
+			statuses = append(statuses, *conv(c))
+		}
+	}
+	apiPodStatus.DebugContainerStatuses = statuses
+
 	return &apiPodStatus
+}
+
+func (kl *Kubelet) statusConverter() func(cs *kubecontainer.ContainerStatus) *v1.ContainerStatus {
+	// TODO(verb): add LastTerminatedState
+	return func(cs *kubecontainer.ContainerStatus) *v1.ContainerStatus {
+		cid := cs.ID.String()
+		status := &v1.ContainerStatus{
+			Name:         cs.Name,
+			RestartCount: int32(cs.RestartCount),
+			Image:        cs.Image,
+			ImageID:      cs.ImageID,
+			ContainerID:  cid,
+		}
+		switch cs.State {
+		case kubecontainer.ContainerStateRunning:
+			status.State.Running = &v1.ContainerStateRunning{StartedAt: metav1.NewTime(cs.StartedAt)}
+		case kubecontainer.ContainerStateCreated:
+			// Treat containers in the "created" state as if they are exited.
+			// The pod workers are supposed start all containers it creates in
+			// one sync (syncPod) iteration. There should not be any normal
+			// "created" containers when the pod worker generates the status at
+			// the beginning of a sync iteration.
+			fallthrough
+		case kubecontainer.ContainerStateExited:
+			status.State.Terminated = &v1.ContainerStateTerminated{
+				ExitCode:    int32(cs.ExitCode),
+				Reason:      cs.Reason,
+				Message:     cs.Message,
+				StartedAt:   metav1.NewTime(cs.StartedAt),
+				FinishedAt:  metav1.NewTime(cs.FinishedAt),
+				ContainerID: cid,
+			}
+		default:
+			status.State.Waiting = &v1.ContainerStateWaiting{}
+		}
+		return status
+	}
 }
 
 // convertToAPIContainerStatuses converts the given internal container

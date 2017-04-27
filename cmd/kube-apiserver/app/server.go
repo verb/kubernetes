@@ -335,7 +335,7 @@ func BuildGenericConfig(s *options.ServerRunOptions) (*genericapiserver.Config, 
 	genericConfig.EnableMetrics = true
 	genericConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(
 		sets.NewString("watch", "proxy"),
-		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
+		sets.NewString("attach", "debug", "exec", "proxy", "log", "portforward"),
 	)
 
 	kubeVersion := version.Get()
