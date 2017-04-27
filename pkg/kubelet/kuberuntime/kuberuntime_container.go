@@ -741,6 +741,25 @@ func (m *kubeGenericRuntimeManager) RunInContainer(id kubecontainer.ContainerID,
 	return append(stdout, stderr...), err
 }
 
+// TODO(verb)
+func (m *kubeGenericRuntimeManager) RunDebugContainer(pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret) error {
+	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	if err != nil {
+		return err
+	}
+
+	podSandboxConfig, err := m.generatePodSandboxConfig(pod, 0)
+	if err != nil {
+		return err
+	}
+
+	if _, err := m.startContainer(podStatus.SandboxStatuses[0].Id, podSandboxConfig, container, pod, podStatus, pullSecrets, podStatus.IP, containerTypeDebug); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // removeContainer removes the container and the container logs.
 // Notice that we remove the container logs first, so that container will not be removed if
 // container logs are failed to be removed, and kubelet will retry this later. This guarantees

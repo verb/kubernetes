@@ -53,6 +53,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -62,6 +63,11 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
+)
+
+const (
+	defaultDebugContainerName = "debug"
+	defaultDebugImage         = "debian"
 )
 
 // Get a list of pods that have data directories.
@@ -1492,6 +1498,46 @@ func (kl *Kubelet) GetExec(podFullName string, podUID types.UID, containerName s
 	default:
 		return nil, fmt.Errorf("container runtime does not support exec")
 	}
+}
+
+func (kl *Kubelet) RunDebugContainer(podFullName string, podUID types.UID, containerName, imageName string, cmd []string) error {
+	pod, found := kl.GetPodByFullName(podFullName)
+	// TODO(verb): should podUID be set?
+	//if !found || (string(podUID) != "" && pod.UID != podUID) {
+	if !found {
+		return fmt.Errorf("pod %s not found", podFullName)
+	}
+
+	if containerName == "" {
+		containerName = defaultDebugContainerName
+	}
+	if imageName == "" {
+		imageName = defaultDebugImage
+	}
+
+	t := true
+	container := &v1.Container{
+		Name:    containerName,
+		Command: cmd,
+		Image:   imageName,
+		Stdin:   true,
+		TTY:     true,
+		SecurityContext: &v1.SecurityContext{
+			// TODO(verb): make configurable
+			Privileged: &t,
+			Capabilities: &v1.Capabilities{
+				Add: []v1.Capability{"ALL"},
+			},
+		},
+	}
+
+	// Currently only implemented in docker CRI
+	r := kl.containerRuntime.(kuberuntime.KubeGenericRuntime) // TODO(verb): this obviously won't do
+	if err := r.RunDebugContainer(pod, container, kl.getPullSecretsForPod(pod)); err != nil {
+		return fmt.Errorf("error creating debug container: %v", err)
+	}
+
+	return nil
 }
 
 // GetAttach gets the URL the attach will be served from, or nil if the Kubelet will serve it.

@@ -37,6 +37,7 @@ func GenerateContainerRef(pod *v1.Pod, container *v1.Container) (*v1.ObjectRefer
 	if err != nil {
 		// TODO: figure out intelligent way to refer to containers that we implicitly
 		// start (like the pod infra container). This is not a good way, ugh.
+		// TODO(verb): update for debug containers
 		fieldPath = ImplicitContainerPrefix + container.Name
 	}
 	ref, err := ref.GetPartialReference(api.Scheme, pod, fieldPath)

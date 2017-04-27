@@ -39,6 +39,7 @@ const (
 	containerTerminationMessagePolicyLabel = "io.kubernetes.container.terminationMessagePolicy"
 	containerPreStopHandlerLabel           = "io.kubernetes.container.preStopHandler"
 	containerPortsLabel                    = "io.kubernetes.container.ports"
+	containerTypeDebug                     = "DEBUG"
 	containerTypeInit                      = "INIT"
 	containerTypeRegular                   = "REGULAR"
 )
