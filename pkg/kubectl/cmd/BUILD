@@ -36,6 +36,7 @@ go_library(
         "create_secret.go",
         "create_service.go",
         "create_serviceaccount.go",
+        "debug.go",
         "delete.go",
         "describe.go",
         "drain.go",
