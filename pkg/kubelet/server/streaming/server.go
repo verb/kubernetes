@@ -124,6 +124,7 @@ func NewServer(config Config, runtime Runtime) (Server, error) {
 		path    string
 		handler restful.RouteFunction
 	}{
+		{"/debug/{token}", s.serveExec},
 		{"/exec/{token}", s.serveExec},
 		{"/attach/{token}", s.serveAttach},
 		{"/portforward/{token}", s.servePortForward},
