@@ -629,7 +629,7 @@ func getDebugRequestParams(req *restful.Request) debugRequestParams {
 		podName:       req.PathParameter("podID"),
 		podUID:        types.UID(req.PathParameter("uid")),
 		containerName: req.PathParameter("containerName"),
-		imageName:     req.Request.URL.Query().Get(api.DebugImageParam),
+		imageName:     req.Request.URL.Query().Get("debug"), // TODO(verb): replace with api.DebugImageParam
 		cmd:           req.Request.URL.Query()[api.ExecCommandParam],
 	}
 }
@@ -735,7 +735,7 @@ func (s *Server) getDebug(request *restful.Request, response *restful.Response) 
 	}
 
 	// TODO(verb): should I be getting UID from the request? because that be broke
-	streamOpts, err := remotecommand.NewOptions(request.Request)
+	streamOpts, err := remotecommandserver.NewOptions(request.Request)
 	if err != nil {
 		utilruntime.HandleError(err)
 		response.WriteError(http.StatusBadRequest, err)
@@ -763,7 +763,7 @@ func (s *Server) getDebug(request *restful.Request, response *restful.Response) 
 		return
 	}
 
-	remotecommand.ServeAttach(response.ResponseWriter,
+	remotecommandserver.ServeAttach(response.ResponseWriter,
 		request.Request,
 		s.host,
 		podFullName,
@@ -771,8 +771,8 @@ func (s *Server) getDebug(request *restful.Request, response *restful.Response) 
 		params.containerName,
 		streamOpts,
 		s.host.StreamingConnectionIdleTimeout(),
-		remotecommand.DefaultStreamCreationTimeout,
-		remotecommand.SupportedStreamingProtocols)
+		remotecommandconsts.DefaultStreamCreationTimeout,
+		remotecommandconsts.SupportedStreamingProtocols)
 }
 
 // getRun handles requests to run a command inside a container.
