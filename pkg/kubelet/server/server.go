@@ -629,7 +629,7 @@ func getDebugRequestParams(req *restful.Request) debugRequestParams {
 		podName:       req.PathParameter("podID"),
 		podUID:        types.UID(req.PathParameter("uid")),
 		containerName: req.PathParameter("containerName"),
-		imageName:     req.Request.URL.Query().Get("debug"), // TODO(verb): replace with api.DebugImageParam
+		imageName:     req.Request.URL.Query().Get("image"), // TODO(verb): replace with api.DebugImageParam
 		cmd:           req.Request.URL.Query()[api.ExecCommandParam],
 	}
 }
@@ -732,6 +732,7 @@ func (s *Server) getDebug(request *restful.Request, response *restful.Response) 
 	// TODO(verb): should this be checked further down the line?
 	if params.imageName == "" {
 		response.WriteError(http.StatusBadRequest, fmt.Errorf("image name required"))
+		return
 	}
 
 	// TODO(verb): should I be getting UID from the request? because that be broke
