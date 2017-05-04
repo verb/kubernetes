@@ -187,8 +187,9 @@ func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByE
 		}
 
 		labeledInfo := getContainerInfoFromLabels(container.Labels)
+		// Debug Containers are only evictable after a pod is deleted
 		// TODO(verb): make debug container behavior configurable
-		if labeledInfo.ContainerType == containerTypeDebug {
+		if labeledInfo.ContainerType == containerTypeDebug && !cgc.isPodDeleted(labeledInfo.PodUID) {
 			continue
 		}
 		containerInfo := containerGCInfo{
