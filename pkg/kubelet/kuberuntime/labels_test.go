@@ -22,6 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
@@ -63,19 +64,50 @@ func TestContainerLabels(t *testing.T) {
 			TerminationGracePeriodSeconds: &terminationGracePeriod,
 		},
 	}
-	expected := &labeledContainerInfo{
-		PodName:       pod.Name,
-		PodNamespace:  pod.Namespace,
-		PodUID:        pod.UID,
-		ContainerName: container.Name,
-		ContainerType: containerTypeRegular,
+
+	var tests = []struct {
+		features string
+		expected *labeledContainerInfo
+	}{
+		{
+			"DebugContainers=False",
+			&labeledContainerInfo{
+				PodName:       pod.Name,
+				PodNamespace:  pod.Namespace,
+				PodUID:        pod.UID,
+				ContainerName: container.Name,
+			},
+		},
+		{
+			"DebugContainers=True",
+			&labeledContainerInfo{
+				PodName:       pod.Name,
+				PodNamespace:  pod.Namespace,
+				PodUID:        pod.UID,
+				ContainerName: container.Name,
+				ContainerType: containerTypeRegular,
+			},
+		},
+		{
+			"DebugContainers=True",
+			&labeledContainerInfo{
+				PodName:       pod.Name,
+				PodNamespace:  pod.Namespace,
+				PodUID:        pod.UID,
+				ContainerName: container.Name,
+				ContainerType: containerTypeInit,
+			},
+		},
 	}
 
 	// Test whether we can get right information from label
-	labels := newContainerLabels(container, pod, containerTypeRegular)
-	containerInfo := getContainerInfoFromLabels(labels)
-	if !reflect.DeepEqual(containerInfo, expected) {
-		t.Errorf("expected %v, got %v", expected, containerInfo)
+	for _, test := range tests {
+		utilfeature.DefaultFeatureGate.Set(test.features)
+		labels := newContainerLabels(container, pod, test.expected.ContainerType)
+		containerInfo := getContainerInfoFromLabels(labels)
+		if !reflect.DeepEqual(containerInfo, test.expected) {
+			t.Errorf("expected %v, got %v", test.expected, containerInfo)
+		}
 	}
 }
 
