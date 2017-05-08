@@ -65,11 +65,6 @@ import (
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
 )
 
-const (
-	defaultDebugContainerName = "debug"
-	defaultDebugImage         = "debian"
-)
-
 // Get a list of pods that have data directories.
 func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 	podInfos, err := ioutil.ReadDir(kl.getPodsDir())
@@ -1480,26 +1475,6 @@ func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port int32,
 	return streamingRuntime.PortForward(&pod, port, stream)
 }
 
-// GetExec gets the URL the exec will be served from, or nil if the Kubelet will serve it.
-func (kl *Kubelet) GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error) {
-	switch streamingRuntime := kl.containerRuntime.(type) {
-	case kubecontainer.DirectStreamingRuntime:
-		// Kubelet will serve the exec directly.
-		return nil, nil
-	case kubecontainer.IndirectStreamingRuntime:
-		container, err := kl.findContainer(podFullName, podUID, containerName)
-		if err != nil {
-			return nil, err
-		}
-		if container == nil {
-			return nil, fmt.Errorf("container not found (%q)", containerName)
-		}
-		return streamingRuntime.GetExec(container.ID, cmd, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, streamOpts.TTY)
-	default:
-		return nil, fmt.Errorf("container runtime does not support exec")
-	}
-}
-
 func (kl *Kubelet) RunDebugContainer(podFullName string, podUID types.UID, containerName, imageName string, cmd []string) error {
 	pod, found := kl.GetPodByFullName(podFullName)
 	// TODO(verb): should podUID be set?
@@ -1508,11 +1483,12 @@ func (kl *Kubelet) RunDebugContainer(podFullName string, podUID types.UID, conta
 		return fmt.Errorf("pod %s not found", podFullName)
 	}
 
+	// TODO(verb): there should be a mechanism for setting these defaults
 	if containerName == "" {
-		containerName = defaultDebugContainerName
+		containerName = "debug"
 	}
 	if imageName == "" {
-		imageName = defaultDebugImage
+		return fmt.Errorf("container image must be specified")
 	}
 
 	t := true
@@ -1538,6 +1514,26 @@ func (kl *Kubelet) RunDebugContainer(podFullName string, podUID types.UID, conta
 	}
 
 	return nil
+}
+
+// GetExec gets the URL the exec will be served from, or nil if the Kubelet will serve it.
+func (kl *Kubelet) GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error) {
+	switch streamingRuntime := kl.containerRuntime.(type) {
+	case kubecontainer.DirectStreamingRuntime:
+		// Kubelet will serve the exec directly.
+		return nil, nil
+	case kubecontainer.IndirectStreamingRuntime:
+		container, err := kl.findContainer(podFullName, podUID, containerName)
+		if err != nil {
+			return nil, err
+		}
+		if container == nil {
+			return nil, fmt.Errorf("container not found (%q)", containerName)
+		}
+		return streamingRuntime.GetExec(container.ID, cmd, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, streamOpts.TTY)
+	default:
+		return nil, fmt.Errorf("container runtime does not support exec")
+	}
 }
 
 // GetAttach gets the URL the attach will be served from, or nil if the Kubelet will serve it.
