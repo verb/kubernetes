@@ -735,13 +735,6 @@ func (s *Server) getDebug(request *restful.Request, response *restful.Response) 
 		return
 	}
 
-	// TODO(verb): should I be getting UID from the request? because that be broke
-	streamOpts, err := remotecommandserver.NewOptions(request.Request)
-	if err != nil {
-		utilruntime.HandleError(err)
-		response.WriteError(http.StatusBadRequest, err)
-		return
-	}
 	pod, ok := s.host.GetPodByName(params.podNamespace, params.podName)
 	if !ok {
 		response.WriteError(http.StatusNotFound, fmt.Errorf("pod does not exist"))
@@ -754,26 +747,7 @@ func (s *Server) getDebug(request *restful.Request, response *restful.Response) 
 		return
 	}
 
-	redirect, err := s.host.GetAttach(podFullName, params.podUID, params.containerName, *streamOpts)
-	if err != nil {
-		streaming.WriteError(err, response.ResponseWriter)
-		return
-	}
-	if redirect != nil {
-		http.Redirect(response.ResponseWriter, request.Request, redirect.String(), http.StatusFound)
-		return
-	}
-
-	remotecommandserver.ServeAttach(response.ResponseWriter,
-		request.Request,
-		s.host,
-		podFullName,
-		params.podUID,
-		params.containerName,
-		streamOpts,
-		s.host.StreamingConnectionIdleTimeout(),
-		remotecommandconsts.DefaultStreamCreationTimeout,
-		remotecommandconsts.SupportedStreamingProtocols)
+	s.getAttach(request, response)
 }
 
 // getRun handles requests to run a command inside a container.
