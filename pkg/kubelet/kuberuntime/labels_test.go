@@ -66,20 +66,30 @@ func TestContainerLabels(t *testing.T) {
 	}
 
 	var tests = []struct {
-		features string
-		expected *labeledContainerInfo
+		description     string
+		featuresCreated string // Features enabled when container is created
+		featuresStatus  string // Features enabled when container status is read
+		typeLabel       string
+		expected        *labeledContainerInfo
 	}{
 		{
+			"Debug containers disabled",
 			"DebugContainers=False",
+			"DebugContainers=False",
+			"ignored",
 			&labeledContainerInfo{
 				PodName:       pod.Name,
 				PodNamespace:  pod.Namespace,
 				PodUID:        pod.UID,
 				ContainerName: container.Name,
+				ContainerType: "",
 			},
 		},
 		{
+			"Regular containers",
 			"DebugContainers=True",
+			"DebugContainers=True",
+			containerTypeRegular,
 			&labeledContainerInfo{
 				PodName:       pod.Name,
 				PodNamespace:  pod.Namespace,
@@ -89,7 +99,10 @@ func TestContainerLabels(t *testing.T) {
 			},
 		},
 		{
+			"Init containers",
 			"DebugContainers=True",
+			"DebugContainers=True",
+			containerTypeInit,
 			&labeledContainerInfo{
 				PodName:       pod.Name,
 				PodNamespace:  pod.Namespace,
@@ -98,17 +111,45 @@ func TestContainerLabels(t *testing.T) {
 				ContainerType: containerTypeInit,
 			},
 		},
+		{
+			"Created without type label",
+			"DebugContainers=False",
+			"DebugContainers=True",
+			"ignored",
+			&labeledContainerInfo{
+				PodName:       pod.Name,
+				PodNamespace:  pod.Namespace,
+				PodUID:        pod.UID,
+				ContainerName: container.Name,
+				ContainerType: "",
+			},
+		},
+		{
+			"Created with type label, subsequently disabled",
+			"DebugContainers=True",
+			"DebugContainers=False",
+			containerTypeRegular,
+			&labeledContainerInfo{
+				PodName:       pod.Name,
+				PodNamespace:  pod.Namespace,
+				PodUID:        pod.UID,
+				ContainerName: container.Name,
+				ContainerType: "",
+			},
+		},
 	}
 
 	// Test whether we can get right information from label
 	for _, test := range tests {
-		utilfeature.DefaultFeatureGate.Set(test.features)
-		labels := newContainerLabels(container, pod, test.expected.ContainerType)
+		utilfeature.DefaultFeatureGate.Set(test.featuresCreated)
+		labels := newContainerLabels(container, pod, test.typeLabel)
+		utilfeature.DefaultFeatureGate.Set(test.featuresStatus)
 		containerInfo := getContainerInfoFromLabels(labels)
 		if !reflect.DeepEqual(containerInfo, test.expected) {
-			t.Errorf("expected %v, got %v", test.expected, containerInfo)
+			t.Errorf("%v: expected %v, got %v", test.description, test.expected, containerInfo)
 		}
 	}
+	utilfeature.DefaultFeatureGate.Set("DebugContainers=False")
 }
 
 func TestContainerAnnotations(t *testing.T) {
