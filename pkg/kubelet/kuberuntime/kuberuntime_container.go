@@ -417,7 +417,6 @@ func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName strin
 			ID:   status.Id,
 		},
 		Name:         labeledInfo.ContainerName,
-		Type:         labeledInfo.ContainerType,
 		Image:        status.Image.Image,
 		ImageID:      status.ImageRef,
 		Hash:         annotatedInfo.Hash,
