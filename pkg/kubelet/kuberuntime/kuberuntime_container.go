@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -34,7 +35,9 @@ import (
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/features"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -741,11 +744,23 @@ func (m *kubeGenericRuntimeManager) RunInContainer(id kubecontainer.ContainerID,
 	return append(stdout, stderr...), err
 }
 
-// TODO(verb)
+// RunDebugContainer creates a Debug Container described by container in the specified pod.
+// A Debug Container is created by an API call and inserted into an already running pod to
+// enable troubleshooting of that pod. The container configuration does not become part of
+// the pod spec, but its status is reported in podStatus. Debug containers are not restarted
+// automatically.
 func (m *kubeGenericRuntimeManager) RunDebugContainer(pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DebugContainers) {
+		return errors.New("Debug Containers feature disabled")
+	}
+
 	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	if err != nil {
 		return err
+	} else if len(podStatus.SandboxStatuses) == 0 {
+		return fmt.Errorf("pod %v/%v not running", pod.Namespace, pod.Name)
+	} else if len(podStatus.SandboxStatuses) != 1 {
+		return fmt.Errorf("pod %v/%v is restarting", pod.Namespace, pod.Name)
 	}
 
 	podSandboxConfig, err := m.generatePodSandboxConfig(pod, 0)
@@ -753,8 +768,8 @@ func (m *kubeGenericRuntimeManager) RunDebugContainer(pod *v1.Pod, container *v1
 		return err
 	}
 
-	if _, err := m.startContainer(podStatus.SandboxStatuses[0].Id, podSandboxConfig, container, pod, podStatus, pullSecrets, podStatus.IP, containerTypeDebug); err != nil {
-		return err
+	if msg, err := m.startContainer(podStatus.SandboxStatuses[0].Id, podSandboxConfig, container, pod, podStatus, pullSecrets, podStatus.IP, containerTypeDebug); err != nil {
+		return fmt.Errorf("cannot start debug container: %v (%v)", err, msg)
 	}
 
 	return nil
