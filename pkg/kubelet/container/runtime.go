@@ -333,6 +333,9 @@ type ContainerStatus struct {
 	// Message written by the container before exiting (stored in
 	// TerminationMessagePath).
 	Message string
+	// Type of this container (e.g. "REGULAR" or "INIT") which is used by the kublet to
+	// differentiate containers that have a status but no spec (e.g. "DEBUG" containers).
+	Type string
 }
 
 // FindContainerStatusByName returns container status in the pod status with the given name.
