@@ -512,8 +512,7 @@ func (m *kubeGenericRuntimeManager) computePodContainerChanges(pod *v1.Pod, podS
 	runningContainerStatuses := podStatus.GetRunningContainerStatuses()
 	for _, containerStatus := range runningContainerStatuses {
 		// Debug Containers should never be killed by SyncPod()
-		// TODO(verb): make it a constant
-		if containerStatus.Type == "DEBUG" {
+		if containerStatus.Type == containerTypeDebug {
 			continue
 		}
 		_, keep := changes.ContainersToKeep[containerStatus.ID]
