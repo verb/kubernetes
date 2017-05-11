@@ -176,6 +176,7 @@ func TestContainerGC(t *testing.T) {
 		}
 		utilfeature.DefaultFeatureGate.Set(feature)
 	}
+	defer utilfeature.DefaultFeatureGate.Set("DebugContainers=False")
 	defaultGCPolicy := kubecontainer.ContainerGCPolicy{MinAge: time.Hour, MaxPerPodContainer: 2, MaxContainers: 6}
 
 	for c, test := range []struct {

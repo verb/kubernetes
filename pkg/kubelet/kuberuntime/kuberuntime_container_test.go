@@ -189,6 +189,7 @@ func podDebugTarget(name string) *v1.Pod {
 // TestRunDebugContainer tests creating and starting a Debug Container in a pod
 func TestRunDebugContainer(t *testing.T) {
 	utilfeature.DefaultFeatureGate.Set("DebugContainers=True")
+	defer utilfeature.DefaultFeatureGate.Set("DebugContainers=False")
 
 	existingPodName := "targetpod"
 	testcases := []struct {
