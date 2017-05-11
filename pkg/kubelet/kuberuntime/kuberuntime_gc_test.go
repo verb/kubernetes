@@ -19,15 +19,19 @@ package kuberuntime
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/v1"
+	apitest "k8s.io/kubernetes/pkg/kubelet/apis/cri/testing"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 func TestSandboxGC(t *testing.T) {
@@ -162,6 +166,16 @@ func TestContainerGC(t *testing.T) {
 			state:     state,
 		}
 	}
+	labelGCDebugContainers := func(containers []*apitest.FakeContainer) {
+		feature := "DebugContainers=False"
+		for _, c := range containers {
+			if strings.HasPrefix(c.ContainerStatus.Metadata.Name, "debug") {
+				c.ContainerStatus.Labels[types.KubernetesContainerTypeLabel] = containerTypeDebug
+				feature = "DebugContainers=True"
+			}
+		}
+		utilfeature.DefaultFeatureGate.Set(feature)
+	}
 	defaultGCPolicy := kubecontainer.ContainerGCPolicy{MinAge: time.Hour, MaxPerPodContainer: 2, MaxContainers: 6}
 
 	for c, test := range []struct {
@@ -294,9 +308,19 @@ func TestContainerGC(t *testing.T) {
 			},
 			remain: []int{0, 1, 2},
 		},
+		{
+			description: "debug containers should not be removed when per pod container limit exceeded",
+			containers: []containerTemplate{
+				makeGCContainer("foo", "debug", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer("foo", "debug", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer("foo", "debug", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
+			},
+			remain: []int{0, 1, 2},
+		},
 	} {
 		t.Logf("TestCase #%d: %+v", c, test)
 		fakeContainers := makeFakeContainers(t, m, test.containers)
+		labelGCDebugContainers(fakeContainers)
 		fakeRuntime.SetFakeContainers(fakeContainers)
 
 		if test.policy == nil {
