@@ -483,7 +483,7 @@ func DebugLocation(
 	loc := &url.URL{
 		Scheme:   nodeInfo.Scheme,
 		Host:     net.JoinHostPort(nodeInfo.Hostname, nodeInfo.Port),
-		Path:     fmt.Sprintf("/debug/%s/%s/%s", pod.Namespace, pod.Name, opts.Container),
+		Path:     fmt.Sprintf("/podDebug/%s/%s/%s", pod.Namespace, pod.Name, opts.Container),
 		RawQuery: params.Encode(),
 	}
 	return loc, nodeInfo.Transport, nil
