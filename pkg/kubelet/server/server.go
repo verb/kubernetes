@@ -326,7 +326,7 @@ func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 
 	ws = new(restful.WebService)
 	ws.
-		Path("/debug")
+		Path("/podDebug")
 	ws.Route(ws.GET("/{podNamespace}/{podID}/{containerName}").
 		To(s.getDebug).
 		Operation("getDebug"))
