@@ -177,7 +177,7 @@ func podDebugTarget(name string) *v1.Pod {
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
-					Name:            "targetcontainer",
+					Name:            "existingcontainer",
 					Image:           "application",
 					ImagePullPolicy: v1.PullIfNotPresent,
 				},
@@ -191,47 +191,53 @@ func TestRunDebugContainer(t *testing.T) {
 	utilfeature.DefaultFeatureGate.Set("DebugContainers=True")
 
 	existingPodName := "targetpod"
-	tests := []struct {
+	testcases := []struct {
 		description string
 		targetPod   *v1.Pod
 		container   v1.Container
 		expectError bool
-	}{
-		{
-			"Valid Debug Container",
-			podDebugTarget(existingPodName),
-			v1.Container{
-				Name:            "debug",
-				Image:           "busybox",
-				ImagePullPolicy: v1.PullIfNotPresent,
-			},
-			false,
+	}{{
+		"success case",
+		podDebugTarget(existingPodName),
+		v1.Container{
+			Name:            "debug",
+			Image:           "busybox",
+			ImagePullPolicy: v1.PullIfNotPresent,
 		},
-		{
-			"Pod doesn't exist",
-			podDebugTarget("otherpod"),
-			v1.Container{
-				Name:            "debug",
-				Image:           "busybox",
-				ImagePullPolicy: v1.PullIfNotPresent,
-			},
-			true,
+		false,
+	}, {
+		"no such pod",
+		podDebugTarget("otherpod"),
+		v1.Container{
+			Name:            "debug",
+			Image:           "busybox",
+			ImagePullPolicy: v1.PullIfNotPresent,
 		},
-	}
+		true,
+	}, {
+		"container spec collision",
+		podDebugTarget(existingPodName),
+		v1.Container{
+			Name:            "existingcontainer",
+			Image:           "busybox",
+			ImagePullPolicy: v1.PullIfNotPresent,
+		},
+		true,
+	}}
 
-	for _, tt := range tests {
+	for _, tc := range testcases {
 		fakeRuntime, _, m, err := createTestRuntimeManager()
-		assert.NoError(t, err, tt.description)
+		assert.NoError(t, err, tc.description)
 		makeAndSetFakePod(t, m, fakeRuntime, podDebugTarget(existingPodName))
 
-		if err := m.RunDebugContainer(tt.targetPod, &tt.container, nil); tt.expectError {
-			assert.Error(t, err, tt.description)
+		if err := m.RunDebugContainer(tc.targetPod, &tc.container, nil); tc.expectError {
+			assert.Error(t, err, tc.description)
 		} else {
 			assert.NoError(t, err)
 
 			// Verify debug container is started
-			assert.Contains(t, fakeRuntime.Called, "CreateContainer", tt.description)
-			assert.Contains(t, fakeRuntime.Called, "StartContainer", tt.description)
+			assert.Contains(t, fakeRuntime.Called, "CreateContainer", tc.description)
+			assert.Contains(t, fakeRuntime.Called, "StartContainer", tc.description)
 		}
 	}
 }

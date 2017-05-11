@@ -754,13 +754,15 @@ func (m *kubeGenericRuntimeManager) RunDebugContainer(pod *v1.Pod, container *v1
 		return errors.New("Debug Containers feature disabled")
 	}
 
+	if kubecontainer.GetContainerSpec(pod, container.Name) != nil {
+		return fmt.Errorf("container name %s conflicts with container in pod spec", container.Name)
+	}
+
 	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	if err != nil {
 		return err
 	} else if len(podStatus.SandboxStatuses) == 0 {
 		return fmt.Errorf("pod %v/%v not running", pod.Namespace, pod.Name)
-	} else if len(podStatus.SandboxStatuses) != 1 {
-		return fmt.Errorf("pod %v/%v is restarting", pod.Namespace, pod.Name)
 	}
 
 	podSandboxConfig, err := m.generatePodSandboxConfig(pod, 0)
