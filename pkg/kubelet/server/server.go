@@ -173,7 +173,7 @@ type HostInterface interface {
 	RunInContainer(name string, uid types.UID, container string, cmd []string) ([]byte, error)
 	ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error
 	AttachContainer(name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error
-	RunDebugContainer(podFullName string, podUID types.UID, containerName, imageName string, cmd []string) error
+	RunDebugContainer(pod *v1.Pod, container *v1.Container) error
 	GetKubeletContainerLogs(podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
 	ServeLogs(w http.ResponseWriter, req *http.Request)
 	PortForward(name string, uid types.UID, port int32, stream io.ReadWriteCloser) error
@@ -729,7 +729,6 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 func (s *Server) getDebug(request *restful.Request, response *restful.Response) {
 	params := getDebugRequestParams(request)
 
-	// TODO(verb): should this be checked further down the line?
 	if params.imageName == "" {
 		response.WriteError(http.StatusBadRequest, fmt.Errorf("image name required"))
 		return
@@ -741,8 +740,24 @@ func (s *Server) getDebug(request *restful.Request, response *restful.Response) 
 		return
 	}
 
-	podFullName := kubecontainer.GetPodFullName(pod)
-	if err := s.host.RunDebugContainer(podFullName, params.podUID, params.containerName, params.imageName, params.cmd); err != nil {
+	t := true
+	container := v1.Container{
+		Name:    params.containerName,
+		Command: params.cmd,
+		Image:   params.imageName,
+		Stdin:   true,
+		TTY:     true,
+		SecurityContext: &v1.SecurityContext{
+			// TODO(verb): make configurable
+			Privileged: &t,
+			Capabilities: &v1.Capabilities{
+				Add: []v1.Capability{"ALL"},
+			},
+		},
+	}
+	// TODO(verb): make sure params.TTY matches container.TTY
+
+	if err := s.host.RunDebugContainer(pod, &container); err != nil {
 		response.WriteError(http.StatusInternalServerError, err) // TODO(verb): better error code?
 		return
 	}
