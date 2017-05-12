@@ -529,15 +529,22 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 	var containerSpec *v1.Container
 	if pod != nil {
 		containerSpec = kubecontainer.GetContainerSpec(pod, containerName)
-	} else {
+	}
+	// Debug Containers can have a pod but no container spec. We could simplify this
+	// logic and ensure containerSpec is never nil by removing this feature gate, but
+	// features.DebugContainers should not change default behavior while in alpha.
+	if pod == nil || (containerSpec == nil && utilfeature.DefaultFeatureGate.Enabled(features.DebugContainers)) {
 		// Restore necessary information if one of the specs is nil.
 		restoredPod, restoredContainer, err := m.restoreSpecsFromContainerLabels(containerID)
 		if err != nil {
 			return err
 		}
-		pod, containerSpec = restoredPod, restoredContainer
+		if pod == nil {
+			pod = restoredPod
+		}
+		containerSpec = restoredContainer
 	}
-	// From this point , pod and container must be non-nil.
+	// From this point, a nil pod or containerSpec will cause a runtime panic
 	gracePeriod := int64(minimumGracePeriodInSeconds)
 	switch {
 	case pod.DeletionGracePeriodSeconds != nil:

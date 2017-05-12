@@ -28,12 +28,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/ref"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/kubernetes/pkg/features"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -511,9 +513,9 @@ func (m *kubeGenericRuntimeManager) computePodContainerChanges(pod *v1.Pod, podS
 	// compute containers to be killed
 	runningContainerStatuses := podStatus.GetRunningContainerStatuses()
 	for _, containerStatus := range runningContainerStatuses {
-		// Debug Containers should never be killed by SyncPod()
+		// Debug Containers should not be killed by SyncPod() unless the sandbox changes
 		// containerStatus.Type is "" when !DefaultFeatureGate.Enabled(features.DebugContainers)
-		if containerStatus.Type == containerTypeDebug {
+		if containerStatus.Type == containerTypeDebug && !sandboxChanged {
 			continue
 		}
 		_, keep := changes.ContainersToKeep[containerStatus.ID]
@@ -529,9 +531,13 @@ func (m *kubeGenericRuntimeManager) computePodContainerChanges(pod *v1.Pod, podS
 				}
 			}
 
+			if killMessage == "" && utilfeature.DefaultFeatureGate.Enabled(features.DebugContainers) {
+				killMessage = "killing debug container for pod restart"
+			}
+
 			changes.ContainersToKill[containerStatus.ID] = containerToKillInfo{
 				name:      containerStatus.Name,
-				container: podContainer,
+				container: podContainer, // nil for Debug Containers
 				message:   killMessage,
 			}
 		}
