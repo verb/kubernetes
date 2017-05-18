@@ -2269,10 +2269,7 @@ type PodStatus struct {
 	// when we have done this.
 	// +optional
 	ContainerStatuses []ContainerStatus
-	// The list has one entry per init container in the manifest. The most recent successful
-	// init container will have ready = true, the most recently started container will have
-	// startTime set.
-	// More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses
+	// The list has one entry per Debug Container run in this pod.
 	DebugContainerStatuses []ContainerStatus
 }
 
@@ -3294,7 +3291,7 @@ type PodExecOptions struct {
 	Command []string
 }
 
-// PodDebugOptions TODO(verb)
+// PodDebugOptions is the query options to a Pod's debug call
 type PodDebugOptions struct {
 	metav1.TypeMeta
 
@@ -3310,13 +3307,13 @@ type PodDebugOptions struct {
 	// TTY if true indicates that a tty will be allocated for the exec call
 	TTY bool
 
-	// Container in which to execute the command.
+	// Name of Debug Container
 	Container string
 
 	// Command is the remote command to execute; argv array; not executed within a shell.
 	Command []string
 
-	// TODO(verb)
+	// Container image to use in the Debug Container to be run in the Pod.
 	Image string
 }
 
@@ -3811,7 +3808,7 @@ const (
 	// and data streams for a single forwarded connection
 	PortForwardRequestIDHeader = "requestID"
 
-	// Command to run for remote debug image
+	// Container Image for Debug Container
 	DebugImageParam = "image"
 )
 

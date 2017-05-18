@@ -37,9 +37,11 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper/qos"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 )
 
@@ -445,7 +447,6 @@ func ExecLocation(
 }
 
 // DebugLocation returns the debug URL for a pod container.
-// TODO(verb): should a blank container name be generated here?
 func DebugLocation(
 	getter ResourceGetter,
 	connInfo client.ConnectionInfoGetter,
@@ -453,15 +454,17 @@ func DebugLocation(
 	name string,
 	opts *api.PodDebugOptions,
 ) (*url.URL, http.RoundTripper, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DebugContainers) {
+		return nil, nil, errors.NewBadRequest("debug containers feature disabled")
+	}
+
 	pod, err := getPod(getter, ctx, name)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// Try to figure out a container
-	// If a container was provided, it must be valid
 	if opts.Container == "" {
-		return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", name))
+		return nil, nil, errors.NewBadRequest(fmt.Sprintf("a new container name must be specified for pod %s", name))
 	}
 	if podHasContainerWithName(pod, opts.Container) {
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("container %s already exists for pod %s", opts.Container, name))

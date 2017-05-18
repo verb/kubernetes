@@ -210,7 +210,7 @@ func (r *DebugREST) New() runtime.Object {
 	return &api.Pod{}
 }
 
-// Connect returns a handler for the pod exec proxy
+// Connect returns a handler for the pod debug proxy
 func (r *DebugREST) Connect(ctx genericapirequest.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
 	debugOpts, ok := opts.(*api.PodDebugOptions)
 	if !ok {
@@ -223,12 +223,12 @@ func (r *DebugREST) Connect(ctx genericapirequest.Context, name string, opts run
 	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, true, responder), nil
 }
 
-// NewConnectOptions returns the versioned object that represents exec parameters
+// NewConnectOptions returns the versioned object that represents debug parameters
 func (r *DebugREST) NewConnectOptions() (runtime.Object, bool, string) {
 	return &api.PodDebugOptions{}, false, ""
 }
 
-// ConnectMethods returns the methods supported by exec
+// ConnectMethods returns the methods supported by debug
 func (r *DebugREST) ConnectMethods() []string {
 	return upgradeableMethods
 }

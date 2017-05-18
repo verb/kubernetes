@@ -3795,7 +3795,7 @@ type PodExecOptions struct {
 	Command []string `json:"command" protobuf:"bytes,6,rep,name=command"`
 }
 
-// PodDebugOptions TODO(verb)
+// PodDebugOptions is the query options to a Pod's debug call
 // ---
 // TODO: This is largely identical to PodAttachOptions above, make sure they stay in sync and see about merging
 // and also when we cut V2, we should export a "StreamOptions" or somesuch that contains Stdin, Stdout, Stder and TTY
@@ -3822,7 +3822,7 @@ type PodDebugOptions struct {
 	// +optional
 	TTY bool `json:"tty,omitempty" protobuf:"varint,4,opt,name=tty"`
 
-	// Container in which to execute the command.
+	// Name of Debug Container
 	// Defaults to only container if there is only one container in the pod.
 	// +optional
 	Container string `json:"container,omitempty" protobuf:"bytes,5,opt,name=container"`
@@ -3830,7 +3830,7 @@ type PodDebugOptions struct {
 	// Command is the remote command to execute. argv array. Not executed within a shell.
 	Command []string `json:"command" protobuf:"bytes,6,rep,name=command"`
 
-	// TODO(verb)
+	// Container image to use in the Debug Container to be run in the Pod.
 	Image string `json:"image" protobuf:"bytes,7,opt,name=image"`
 }
 
