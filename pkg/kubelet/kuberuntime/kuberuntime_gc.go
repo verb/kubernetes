@@ -190,7 +190,7 @@ func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByE
 		// Debug Containers are only evictable after a pod is deleted
 		// If the DebugContainers feature is disabled, ContainerType will be "".
 		// TODO(verb): make debug container behavior configurable
-		if labeledInfo.ContainerType == containerTypeDebug && !cgc.isPodDeleted(labeledInfo.PodUID) {
+		if labeledInfo.ContainerType == kubecontainer.ContainerTypeDebug && !cgc.isPodDeleted(labeledInfo.PodUID) {
 			continue
 		}
 		containerInfo := containerGCInfo{

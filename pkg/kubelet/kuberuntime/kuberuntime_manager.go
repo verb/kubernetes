@@ -515,7 +515,7 @@ func (m *kubeGenericRuntimeManager) computePodContainerChanges(pod *v1.Pod, podS
 	for _, containerStatus := range runningContainerStatuses {
 		// Debug Containers should not be killed by SyncPod() unless the sandbox changes
 		// containerStatus.Type is "" when !DefaultFeatureGate.Enabled(features.DebugContainers)
-		if containerStatus.Type == containerTypeDebug && !sandboxChanged {
+		if containerStatus.Type == kubecontainer.ContainerTypeDebug && !sandboxChanged {
 			continue
 		}
 		_, keep := changes.ContainersToKeep[containerStatus.ID]

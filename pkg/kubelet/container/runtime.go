@@ -275,6 +275,7 @@ const (
 type ContainerType string
 
 const (
+	ContainerTypeDebug   ContainerType = "DEBUG"
 	ContainerTypeInit    ContainerType = "INIT"
 	ContainerTypeRegular ContainerType = "REGULAR"
 )
@@ -350,7 +351,7 @@ type ContainerStatus struct {
 	Message string
 	// Type of this container (e.g. "REGULAR" or "INIT") which is used by the kublet to
 	// differentiate containers that have a status but no spec (e.g. "DEBUG" containers).
-	Type string
+	Type ContainerType
 }
 
 // FindContainerStatusByName returns container status in the pod status with the given name.

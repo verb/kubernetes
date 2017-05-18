@@ -783,7 +783,7 @@ func (m *kubeGenericRuntimeManager) RunDebugContainer(pod *v1.Pod, container *v1
 		return err
 	}
 
-	if msg, err := m.startContainer(podStatus.SandboxStatuses[0].Id, podSandboxConfig, container, pod, podStatus, pullSecrets, podStatus.IP, containerTypeDebug); err != nil {
+	if msg, err := m.startContainer(podStatus.SandboxStatuses[0].Id, podSandboxConfig, container, pod, podStatus, pullSecrets, podStatus.IP, kubecontainer.ContainerTypeDebug); err != nil {
 		return fmt.Errorf("cannot start debug container: %v (%v)", err, msg)
 	}
 

@@ -170,7 +170,7 @@ func TestContainerGC(t *testing.T) {
 		feature := "DebugContainers=False"
 		for _, c := range containers {
 			if strings.HasPrefix(c.ContainerStatus.Metadata.Name, "debug") {
-				c.ContainerStatus.Labels[types.KubernetesContainerTypeLabel] = containerTypeDebug
+				c.ContainerStatus.Labels[types.KubernetesContainerTypeLabel] = string(kubecontainer.ContainerTypeDebug)
 				feature = "DebugContainers=True"
 			}
 		}
