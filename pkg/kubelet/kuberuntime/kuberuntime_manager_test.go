@@ -70,7 +70,7 @@ type sandboxTemplate struct {
 type containerTemplate struct {
 	pod            *v1.Pod
 	container      *v1.Container
-	containerType  string
+	containerType  kubecontainer.ContainerType
 	sandboxAttempt uint32
 	attempt        int
 	createdAt      int64

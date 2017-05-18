@@ -69,7 +69,7 @@ func TestContainerLabels(t *testing.T) {
 		description     string
 		featuresCreated string // Features enabled when container is created
 		featuresStatus  string // Features enabled when container status is read
-		typeLabel       string
+		typeLabel       kubecontainer.ContainerType
 		expected        *labeledContainerInfo
 	}{
 		{
@@ -89,26 +89,26 @@ func TestContainerLabels(t *testing.T) {
 			"Regular containers",
 			"DebugContainers=True",
 			"DebugContainers=True",
-			containerTypeRegular,
+			kubecontainer.ContainerTypeRegular,
 			&labeledContainerInfo{
 				PodName:       pod.Name,
 				PodNamespace:  pod.Namespace,
 				PodUID:        pod.UID,
 				ContainerName: container.Name,
-				ContainerType: containerTypeRegular,
+				ContainerType: kubecontainer.ContainerTypeRegular,
 			},
 		},
 		{
 			"Init containers",
 			"DebugContainers=True",
 			"DebugContainers=True",
-			containerTypeInit,
+			kubecontainer.ContainerTypeInit,
 			&labeledContainerInfo{
 				PodName:       pod.Name,
 				PodNamespace:  pod.Namespace,
 				PodUID:        pod.UID,
 				ContainerName: container.Name,
-				ContainerType: containerTypeInit,
+				ContainerType: kubecontainer.ContainerTypeInit,
 			},
 		},
 		{
@@ -128,7 +128,7 @@ func TestContainerLabels(t *testing.T) {
 			"Created with type label, subsequently disabled",
 			"DebugContainers=True",
 			"DebugContainers=False",
-			containerTypeRegular,
+			kubecontainer.ContainerTypeRegular,
 			&labeledContainerInfo{
 				PodName:       pod.Name,
 				PodNamespace:  pod.Namespace,
