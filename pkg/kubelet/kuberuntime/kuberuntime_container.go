@@ -751,11 +751,9 @@ func (m *kubeGenericRuntimeManager) RunInContainer(id kubecontainer.ContainerID,
 	return append(stdout, stderr...), err
 }
 
-// RunDebugContainer creates a Debug Container described by container in the specified pod.
-// A Debug Container is created by an API call and inserted into an already running pod to
-// enable troubleshooting of that pod. The container configuration does not become part of
-// the pod spec, but its status is reported in podStatus. Debug containers are not restarted
-// automatically.
+// RunDebugContainer creates a Debug Container described by container in pod if it is not
+// already running. The container configuration does not become part of the pod spec, but its
+// status is reported in PodStatus. Return success if the debug container is already running.
 func (m *kubeGenericRuntimeManager) RunDebugContainer(pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DebugContainers) {
 		return errors.New("Debug Containers feature disabled")
@@ -770,6 +768,14 @@ func (m *kubeGenericRuntimeManager) RunDebugContainer(pod *v1.Pod, container *v1
 		return err
 	} else if len(podStatus.SandboxStatuses) == 0 {
 		return fmt.Errorf("pod %v/%v not running", pod.Namespace, pod.Name)
+	}
+
+	// We haven't reached consensus yet on how to handle reattaching, so in the mean time RunDebugContainer()
+	// returns success if the container already exists and is running. getDebug() will then implicitly reattach.
+	for _, c := range podStatus.ContainerStatuses {
+		if c.Name == container.Name && c.State == kubecontainer.ContainerStateRunning {
+			return nil
+		}
 	}
 
 	podSandboxConfig, err := m.generatePodSandboxConfig(pod, 0)
