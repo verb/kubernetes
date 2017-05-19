@@ -35,6 +35,20 @@ func (g CommandGroups) Add(c *cobra.Command) {
 	}
 }
 
+// PruneCommands removes commands that are set to nil. This allows commands to disable
+// themselves by returning a nil cobra.Command.
+func (g CommandGroups) PruneCommands() {
+	for i, group := range g {
+		gc := make([]*cobra.Command, 0, len(group.Commands))
+		for _, c := range group.Commands {
+			if c != nil {
+				gc = append(gc, c)
+			}
+		}
+		g[i].Commands = gc
+	}
+}
+
 func (g CommandGroups) Has(c *cobra.Command) bool {
 	for _, group := range g {
 		for _, command := range group.Commands {

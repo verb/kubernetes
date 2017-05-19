@@ -19,7 +19,10 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"os"
+	"strings"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/auth"
@@ -252,6 +255,12 @@ var (
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.
 func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
+	if f := os.Getenv("KUBECTL_FEATURE_GATES"); f != "" {
+		if e := utilfeature.DefaultFeatureGate.Set(f); e != nil {
+			fmt.Fprintf(err, "Invalid KUBECTL_FEATURE_GATES %q. Available features:\n%s\n", f, strings.Join(utilfeature.DefaultFeatureGate.KnownFeatures(), "\n"))
+		}
+	}
+
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
 		Use:   "kubectl",
@@ -354,6 +363,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			},
 		},
 	}
+	groups.PruneCommands()
 	groups.Add(cmds)
 
 	filters := []string{
