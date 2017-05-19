@@ -21,7 +21,6 @@ import (
 	"io"
 	"net/url"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -109,27 +108,6 @@ func (*DefaultRemoteDebugger) Debug(method string, url *url.URL, config *restcli
 	})
 }
 
-/*
-type StreamOptions struct {
-	Namespace     string
-	PodName       string
-	ContainerName string
-	Stdin         bool
-	TTY           bool
-	// minimize unnecessary output
-	Quiet bool
-	// InterruptParent, if set, is used to handle interrupts while attached
-	InterruptParent *interrupt.Handler
-	In              io.Reader
-	Out             io.Writer
-	Err             io.Writer
-
-	// for testing
-	overrideStreams func() (io.ReadCloser, io.Writer, io.Writer)
-	isTerminalIn    func(t remotecommand.TTY) bool
-}
-*/
-
 // DebugOptions declare the arguments accepted by the Debug command
 type DebugOptions struct {
 	StreamOptions
@@ -211,60 +189,6 @@ func (p *DebugOptions) Validate() error {
 	return nil
 }
 
-/*
-func (o *StreamOptions) setupTTY() term.TTY {
-	t := term.TTY{
-		Parent: o.InterruptParent,
-		Out:    o.Out,
-	}
-
-	if !o.Stdin {
-		// need to nil out o.In to make sure we don't create a stream for stdin
-		o.In = nil
-		o.TTY = false
-		return t
-	}
-
-	t.In = o.In
-	if !o.TTY {
-		return t
-	}
-
-	if o.isTerminalIn == nil {
-		o.isTerminalIn = func(tty term.TTY) bool {
-			return tty.IsTerminalIn()
-		}
-	}
-	if !o.isTerminalIn(t) {
-		o.TTY = false
-
-		if o.Err != nil {
-			fmt.Fprintln(o.Err, "Unable to use a TTY - input is not a terminal or the right kind of file")
-		}
-
-		return t
-	}
-
-	// if we get to here, the user wants to attach stdin, wants a TTY, and o.In is a terminal, so we
-	// can safely set t.Raw to true
-	t.Raw = true
-
-	if o.overrideStreams == nil {
-		// use dockerterm.StdStreams() to get the right I/O handles on Windows
-		o.overrideStreams = dockerterm.StdStreams
-	}
-	stdin, stdout, _ := o.overrideStreams()
-	o.In = stdin
-	t.In = stdin
-	if o.Out != nil {
-		o.Out = stdout
-		t.Out = stdout
-	}
-
-	return t
-}
-*/
-
 // Run debugs a validated remote debugging against a pod.
 func (p *DebugOptions) Run() error {
 	pod, err := p.PodClient.Pods(p.Namespace).Get(p.PodName, metav1.GetOptions{})
@@ -322,11 +246,10 @@ func (p *DebugOptions) Run() error {
 			Resource("pods").
 			Name(pod.Name).
 			Namespace(pod.Namespace).
-			SubResource("debug").
-			Param("container", containerName).
-			Param("image", imageName)
-		req.VersionedParams(&api.PodExecOptions{
+			SubResource("debug")
+		req.VersionedParams(&api.PodDebugOptions{
 			Container: containerName,
+			Image:     imageName,
 			Command:   p.Command,
 			Stdin:     p.Stdin,
 			Stdout:    p.Out != nil,
@@ -334,7 +257,6 @@ func (p *DebugOptions) Run() error {
 			TTY:       t.Raw,
 		}, api.ParameterCodec)
 
-		glog.Info("POST: ", req.URL())
 		return p.Debugger.Debug("POST", req.URL(), p.Config, p.In, p.Out, p.Err, t.Raw, sizeQueue)
 	}
 
