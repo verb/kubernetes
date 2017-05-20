@@ -728,9 +728,15 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 // getDebug handles requests to add a debug container to a pod
 func (s *Server) getDebug(request *restful.Request, response *restful.Response) {
 	params := getDebugRequestParams(request)
+	streamOpts, err := remotecommandserver.NewOptions(request.Request)
+	if err != nil {
+		utilruntime.HandleError(err)
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
 
-	if params.imageName == "" {
-		response.WriteError(http.StatusBadRequest, fmt.Errorf("image name required"))
+	if params.containerName == "" || params.imageName == "" {
+		response.WriteError(http.StatusBadRequest, fmt.Errorf("container and image names required"))
 		return
 	}
 
@@ -740,25 +746,24 @@ func (s *Server) getDebug(request *restful.Request, response *restful.Response) 
 		return
 	}
 
-	t := true
 	container := v1.Container{
 		Name:    params.containerName,
 		Command: params.cmd,
 		Image:   params.imageName,
-		Stdin:   true,
-		TTY:     true,
+		Stdin:   streamOpts.Stdin,
+		TTY:     streamOpts.TTY,
 		SecurityContext: &v1.SecurityContext{
-			// TODO(verb): make configurable
-			Privileged: &t,
+			// TODO(verb): Make these configurable once the api settles
+			// These are the capabilities needed for strace and nsenter.
 			Capabilities: &v1.Capabilities{
-				Add: []v1.Capability{"ALL"},
+				Add: []v1.Capability{"SYS_ADMIN", "SYS_PTRACE"},
 			},
 		},
 	}
-	// TODO(verb): make sure params.TTY matches container.TTY
 
 	if err := s.host.RunDebugContainer(pod, &container); err != nil {
-		response.WriteError(http.StatusInternalServerError, err) // TODO(verb): better error code?
+		utilruntime.HandleError(err)
+		response.WriteError(http.StatusInternalServerError, err)
 		return
 	}
 
