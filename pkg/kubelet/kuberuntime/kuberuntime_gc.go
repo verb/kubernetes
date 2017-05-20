@@ -187,12 +187,6 @@ func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByE
 		}
 
 		labeledInfo := getContainerInfoFromLabels(container.Labels)
-		// Debug Containers are only evictable after a pod is deleted
-		// If the DebugContainers feature is disabled, ContainerType will be "".
-		// TODO(verb): make debug container behavior configurable
-		if labeledInfo.ContainerType == kubecontainer.ContainerTypeDebug && !cgc.isPodDeleted(labeledInfo.PodUID) {
-			continue
-		}
 		containerInfo := containerGCInfo{
 			id:         container.Id,
 			name:       container.Metadata.Name,
@@ -364,9 +358,8 @@ func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
 }
 
 // GarbageCollect removes dead containers using the specified container gc policy.
-// Note that gc policy is not applied to sandboxes or debug containers. Sandboxes are
-// removed when they are not ready and contain no containers. Debug containers are
-// removed when the pod is deleted.
+// Note that gc policy is not applied to sandboxes. Sandboxes are only removed when they are
+// not ready and containing no containers.
 //
 // GarbageCollect consists of the following steps:
 // * gets evictable containers which are not active and created more than gcPolicy.MinAge ago.

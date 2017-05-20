@@ -89,7 +89,6 @@ go_test(
         "//pkg/kubelet/apis/cri/v1alpha1:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",
-        "//pkg/kubelet/types:go_default_library",
         "//vendor/github.com/golang/mock/gomock:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
