@@ -128,11 +128,10 @@ func (p *DebugOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []
 	p.Command = argsIn[1:]
 
 	if len(p.ContainerName) == 0 {
-		fmt.Fprintf(p.Err, "Defaulting container name to %q.\n", debugDefaultContainerName)
 		p.ContainerName = debugDefaultContainerName
 	}
+
 	if len(p.ImageName) == 0 {
-		fmt.Fprintf(p.Err, "Defaulting image name to %q.\n", debugDefaultImageName)
 		p.ImageName = debugDefaultImageName
 	}
 
