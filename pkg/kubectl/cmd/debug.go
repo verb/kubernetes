@@ -210,10 +210,10 @@ func (p *DebugOptions) RunDebug() error {
 			Resource("pods").
 			Name(pod.Name).
 			Namespace(pod.Namespace).
-			SubResource("debug")
-		req.VersionedParams(&api.PodDebugOptions{
+			SubResource("debug").
+			Param("image", p.ImageName) // TODO(verb): replace with versioned param when available
+		req.VersionedParams(&api.PodExecOptions{
 			Container: p.ContainerName,
-			Image:     p.ImageName,
 			Command:   p.Command,
 			Stdin:     p.Stdin,
 			Stdout:    p.Out != nil,
