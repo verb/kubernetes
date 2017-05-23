@@ -1842,6 +1842,79 @@ func TestPortForward(t *testing.T) {
 	}
 }
 
+func TestDebugContainer(t *testing.T) {
+	const (
+		podName                = "targetpod"
+		podNamespace           = "namespace"
+		podUID       types.UID = "12345678"
+		containerID            = "existingcontainer"
+	)
+	var (
+		debugContainer = &v1.Container{
+			Name:            "debug",
+			Image:           "busybox",
+			ImagePullPolicy: v1.PullIfNotPresent,
+			Command:         []string{"ls"},
+		}
+		targetPod = &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       "12345678",
+				Name:      "targetPod",
+				Namespace: "namespace",
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:            "targetcontainer",
+						Image:           "application",
+						ImagePullPolicy: v1.PullIfNotPresent,
+					},
+				},
+			},
+		}
+	)
+
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	testKubelet.fakeRuntime.PodList = []*containertest.FakePod{
+		{Pod: &kubecontainer.Pod{
+			ID:        podUID,
+			Name:      podName,
+			Namespace: podNamespace,
+			Containers: []*kubecontainer.Container{
+				{Name: containerID,
+					ID: kubecontainer.ContainerID{Type: "test", ID: containerID},
+				},
+			},
+		}},
+	}
+	assert.Error(t, kubelet.RunDebugContainer(targetPod, debugContainer), "unsupported runtime")
+
+	fakeRuntime := &containertest.FakeDebugContainerRunner{FakeRuntime: testKubelet.fakeRuntime}
+	kubelet.containerRuntime = fakeRuntime
+
+	testcases := []struct {
+		description   string
+		expectedError error
+	}{
+		{"success case", nil},
+		{"failure case", errors.New("feature disabled")},
+	}
+
+	for _, tc := range testcases {
+		fakeRuntime.ClearCalls()
+		fakeRuntime.Err = tc.expectedError
+
+		if err := kubelet.RunDebugContainer(targetPod, debugContainer); tc.expectedError != nil {
+			assert.Error(t, err, tc.description)
+		} else {
+			assert.NoError(t, err, tc.description)
+			assert.NoError(t, fakeRuntime.AssertCalls([]string{"RunDebugContainer"}), tc.description)
+		}
+	}
+}
+
 // Tests that identify the host port conflicts are detected correctly.
 func TestGetHostPortConflicts(t *testing.T) {
 	pods := []*v1.Pod{

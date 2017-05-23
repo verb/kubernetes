@@ -1470,6 +1470,19 @@ func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port int32,
 	return streamingRuntime.PortForward(&pod, port, stream)
 }
 
+func (kl *Kubelet) RunDebugContainer(pod *v1.Pod, container *v1.Container) error {
+	// Only the generic runtime manager supports Debug Containers
+	switch r := kl.containerRuntime.(type) {
+	default:
+		return fmt.Errorf("runtime %v does not support debug containers", r.Type())
+	case kubecontainer.DebugContainerRunner:
+		if err := r.RunDebugContainer(pod, container, kl.getPullSecretsForPod(pod)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // GetExec gets the URL the exec will be served from, or nil if the Kubelet will serve it.
 func (kl *Kubelet) GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error) {
 	switch streamingRuntime := kl.containerRuntime.(type) {
