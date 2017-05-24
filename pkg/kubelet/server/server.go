@@ -747,11 +747,12 @@ func (s *Server) getDebug(request *restful.Request, response *restful.Response) 
 	}
 
 	container := v1.Container{
-		Name:    params.containerName,
-		Command: params.cmd,
-		Image:   params.imageName,
-		Stdin:   streamOpts.Stdin,
-		TTY:     streamOpts.TTY,
+		Name:            params.containerName,
+		Command:         params.cmd,
+		Image:           params.imageName,
+		ImagePullPolicy: v1.PullAlways,
+		Stdin:           streamOpts.Stdin,
+		TTY:             streamOpts.TTY,
 		SecurityContext: &v1.SecurityContext{
 			// TODO(verb): Make these configurable once the api settles
 			// These are the capabilities needed for strace and nsenter.
