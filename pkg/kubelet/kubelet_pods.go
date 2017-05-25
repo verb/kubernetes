@@ -1252,7 +1252,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 	statuses, seen := []v1.ContainerStatus{}, map[string]bool{}
 	sort.Sort(sort.Reverse(kubecontainer.SortContainerStatusesByCreationTime(podStatus.ContainerStatuses)))
 	for _, c := range podStatus.ContainerStatuses {
-		if c.Type == "DEBUG" && !seen[c.Name] {
+		if c.Type == kubecontainer.ContainerTypeDebug && !seen[c.Name] {
 			statuses = append(statuses, *conv(c))
 		}
 	}
