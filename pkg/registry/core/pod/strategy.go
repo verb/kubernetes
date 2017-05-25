@@ -355,6 +355,11 @@ func podHasContainerWithName(pod *api.Pod, containerName string) bool {
 			return true
 		}
 	}
+	for _, c := range pod.Status.DebugContainerStatuses {
+		if c.Name == containerName && c.State.Terminated == nil {
+			return true
+		}
+	}
 	return false
 }
 

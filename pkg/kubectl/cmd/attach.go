@@ -310,6 +310,12 @@ func (p *AttachOptions) containerToAttachTo(pod *api.Pod) (*api.Container, error
 				return &pod.Spec.InitContainers[i], nil
 			}
 		}
+		for i := range pod.Status.DebugContainerStatuses {
+			if pod.Status.DebugContainerStatuses[i].Name == p.ContainerName {
+				// TODO(verb): document and... TTY?
+				return &api.Container{Name: p.ContainerName, TTY: p.TTY}, nil
+			}
+		}
 		return nil, fmt.Errorf("container not found (%s)", p.ContainerName)
 	}
 
