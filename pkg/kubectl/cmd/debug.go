@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -66,7 +66,7 @@ func NewCmdDebug(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *
 	cmd := &cobra.Command{
 		Use:     "debug POD [-c CONTAINER] -- COMMAND [args...]",
 		Short:   i18n.T("Run a debug container in a pod"),
-		Long:    "Run a new container inside an existing pod.",
+		Long:    "Run a Debug Container inside an existing pod.",
 		Example: debug_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			argsLenAtDash := cmd.ArgsLenAtDash()
@@ -170,7 +170,7 @@ func (p *DebugOptions) Validate() error {
 		return fmt.Errorf("both output and error output must be provided")
 	}
 	if p.Debugger == nil || p.PodClient == nil || p.Config == nil {
-		return fmt.Errorf("client, client config, and debugutor must be provided")
+		return fmt.Errorf("client, client config, and debugger must be provided")
 	}
 	return nil
 }
@@ -223,9 +223,5 @@ func (p *DebugOptions) RunDebug() error {
 		return p.Debugger.Debug("POST", req.URL(), p.Config, p.In, p.Out, p.Err, t.Raw, sizeQueue)
 	}
 
-	if err := t.Safe(fn); err != nil {
-		return err
-	}
-
-	return nil
+	return t.Safe(fn)
 }
