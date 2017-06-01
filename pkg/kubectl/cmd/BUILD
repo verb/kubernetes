@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "alpha.go",
         "annotate.go",
         "apiversions.go",
         "apply.go",
@@ -85,7 +86,6 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion:go_default_library",
         "//pkg/client/unversioned:go_default_library",
-        "//pkg/features:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/auth:go_default_library",
         "//pkg/kubectl/cmd/config:go_default_library",
@@ -138,7 +138,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/yaml:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/version:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//vendor/k8s.io/client-go/discovery:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",

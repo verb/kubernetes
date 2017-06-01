@@ -19,10 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
-	"strings"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/auth"
@@ -255,12 +252,6 @@ var (
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.
 func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
-	if f := os.Getenv("KUBECTL_FEATURE_GATES"); f != "" {
-		if e := utilfeature.DefaultFeatureGate.Set(f); e != nil {
-			fmt.Fprintf(err, "Invalid KUBECTL_FEATURE_GATES %q. Available features:\n%s\n", f, strings.Join(utilfeature.DefaultFeatureGate.KnownFeatures(), "\n"))
-		}
-	}
-
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
 		Use:   "kubectl",
@@ -337,7 +328,6 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 				NewCmdLogs(f, out),
 				NewCmdAttach(f, in, out, err),
 				NewCmdExec(f, in, out, err),
-				NewCmdDebug(f, in, out, err),
 				NewCmdPortForward(f, out, err),
 				NewCmdProxy(f, out),
 				NewCmdCp(f, out, err),
@@ -363,13 +353,19 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			},
 		},
 	}
-	groups.PruneCommands()
 	groups.Add(cmds)
 
 	filters := []string{
 		"options",
 		deprecated("kubectl", "delete", cmds, NewCmdStop(f, out)),
 	}
+
+	// Hide the "alpha" subcommand if there are no alpha commands in this build.
+	alpha := NewCmdAlpha(f, in, out, err)
+	if !alpha.HasSubCommands() {
+		filters = append(filters, alpha.Name())
+	}
+
 	templates.ActsAsRootCommand(cmds, filters, groups...)
 
 	for name, completion := range bash_completion_flags {
@@ -384,6 +380,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		}
 	}
 
+	cmds.AddCommand(alpha)
 	cmds.AddCommand(cmdconfig.NewCmdConfig(clientcmd.NewDefaultPathOptions(), out, err))
 	cmds.AddCommand(NewCmdPlugin(f, in, out, err))
 	cmds.AddCommand(NewCmdVersion(f, out))
