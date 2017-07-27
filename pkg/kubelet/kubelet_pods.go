@@ -1592,6 +1592,30 @@ func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port int32,
 	return streamingRuntime.PortForward(&pod, port, stream)
 }
 
+func (kl *Kubelet) RunDebugContainer(pod *v1.Pod, container *v1.Container) error {
+	// Only the generic runtime manager supports Debug Containers
+	r, ok := kl.containerRuntime.(kubecontainer.DebugContainerRunner)
+	if !ok {
+		return fmt.Errorf("runtime %v does not support debug containers", kl.containerRuntime.Type())
+	}
+
+	if err := r.RunDebugContainer(pod, container, kl.getPullSecretsForPod(pod)); err != nil {
+		return err
+	}
+
+	// Schedule a sync so that the api server gets a ContainerStatus as soon as possible.
+	// We don't rely on the apiserver having up-to-date status, but it's nice.
+	glog.V(5).Infof("Scheduling sync of new Debug Container %s in pod %s", container.Name, pod.Name)
+	mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
+	kl.podWorkers.UpdatePod(&UpdatePodOptions{
+		Pod:        pod,
+		MirrorPod:  mirrorPod,
+		UpdateType: kubetypes.SyncPodSync,
+	})
+
+	return nil
+}
+
 // GetExec gets the URL the exec will be served from, or nil if the Kubelet will serve it.
 func (kl *Kubelet) GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error) {
 	switch streamingRuntime := kl.containerRuntime.(type) {
@@ -1628,17 +1652,16 @@ func (kl *Kubelet) GetAttach(podFullName string, podUID types.UID, containerName
 		}
 
 		// The TTY setting for attach must match the TTY setting in the initial container configuration,
-		// since whether the process is running in a TTY cannot be changed after it has started.  We
-		// need the api.Pod to get the TTY status.
+		// since whether the process is running in a TTY cannot be changed after it has started.  Use
+		// api.Pod to override the TTY status for containers that have a spec.
+		tty := streamOpts.TTY
 		pod, found := kl.GetPodByFullName(podFullName)
 		if !found || (string(podUID) != "" && pod.UID != podUID) {
 			return nil, fmt.Errorf("pod %s not found", podFullName)
 		}
-		containerSpec := kubecontainer.GetContainerSpec(pod, containerName)
-		if containerSpec == nil {
-			return nil, fmt.Errorf("container %s not found in pod %s", containerName, podFullName)
+		if containerSpec := kubecontainer.GetContainerSpec(pod, containerName); containerSpec != nil {
+			tty = containerSpec.TTY
 		}
-		tty := containerSpec.TTY
 
 		return streamingRuntime.GetAttach(container.ID, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, tty)
 	default:

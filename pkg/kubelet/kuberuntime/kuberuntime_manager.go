@@ -118,6 +118,7 @@ type KubeGenericRuntime interface {
 	kubecontainer.Runtime
 	kubecontainer.IndirectStreamingRuntime
 	kubecontainer.ContainerCommandRunner
+	kubecontainer.DebugContainerRunner
 }
 
 // NewKubeGenericRuntimeManager creates a new kubeGenericRuntimeManager
@@ -341,7 +342,7 @@ type containerToKillInfo struct {
 
 // podActions keeps information what to do for a pod.
 type podActions struct {
-	// Stop all running (regular and init) containers and the sandbox for the pod.
+	// Stop all running (regular, init and debug) containers and the sandbox for the pod.
 	KillPod bool
 	// Whether need to create a new sandbox. If needed to kill pod and create a
 	// a new pod sandbox, all init containers need to be purged (i.e., removed).
@@ -417,6 +418,7 @@ func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) boo
 }
 
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
+// TODO(verb): add test to make sure doesn't kill debug containers
 func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *kubecontainer.PodStatus) podActions {
 	glog.V(5).Infof("Syncing Pod %q: %+v", format.Pod(pod), pod)
 
