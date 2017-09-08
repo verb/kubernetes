@@ -1652,14 +1652,21 @@ func (kl *Kubelet) GetAttach(podFullName string, podUID types.UID, containerName
 		}
 
 		// The TTY setting for attach must match the TTY setting in the initial container configuration,
-		// since whether the process is running in a TTY cannot be changed after it has started.  Use
-		// api.Pod to override the TTY status for containers that have a spec.
-		tty := streamOpts.TTY
-		pod, found := kl.GetPodByFullName(podFullName)
-		if !found || (string(podUID) != "" && pod.UID != podUID) {
-			return nil, fmt.Errorf("pod %s not found", podFullName)
-		}
-		if containerSpec := kubecontainer.GetContainerSpec(pod, containerName); containerSpec != nil {
+		// since whether the process is running in a TTY cannot be changed after it has started.  We
+		// need the api.Pod to get the TTY status.
+		var tty bool
+		if container.Type == kubecontainer.ContainerTypeDebug {
+			// Debug Containers always have a TTY
+			tty = true
+		} else {
+			pod, found := kl.GetPodByFullName(podFullName)
+			if !found || (string(podUID) != "" && pod.UID != podUID) {
+				return nil, fmt.Errorf("pod %s not found", podFullName)
+			}
+			containerSpec := kubecontainer.GetContainerSpec(pod, containerName)
+			if containerSpec == nil {
+				return nil, fmt.Errorf("container %s not found in pod %s", containerName, podFullName)
+			}
 			tty = containerSpec.TTY
 		}
 

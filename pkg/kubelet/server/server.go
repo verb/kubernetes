@@ -48,10 +48,12 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/httplog"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flushwriter"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1/validation"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
@@ -173,6 +175,7 @@ type HostInterface interface {
 	RunInContainer(name string, uid types.UID, container string, cmd []string) ([]byte, error)
 	ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error
 	AttachContainer(name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error
+	RunDebugContainer(pod *v1.Pod, container *v1.Container) error
 	GetKubeletContainerLogs(podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
 	ServeLogs(w http.ResponseWriter, req *http.Request)
 	PortForward(name string, uid types.UID, port int32, stream io.ReadWriteCloser) error
@@ -355,6 +358,23 @@ func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 	ws.Route(ws.POST("/{podNamespace}/{podID}/{uid}").
 		To(s.getPortForward).
 		Operation("getPortForward"))
+	s.restfulCont.Add(ws)
+
+	ws = new(restful.WebService)
+	ws.
+		Path("/podDebug")
+	ws.Route(ws.GET("/{podNamespace}/{podID}/{containerName}").
+		To(s.getDebug).
+		Operation("getDebug"))
+	ws.Route(ws.POST("/{podNamespace}/{podID}/{containerName}").
+		To(s.getDebug).
+		Operation("getDebug"))
+	ws.Route(ws.GET("/{podNamespace}/{podID}/{uid}/{containerName}").
+		To(s.getDebug).
+		Operation("getDebug"))
+	ws.Route(ws.POST("/{podNamespace}/{podID}/{uid}/{containerName}").
+		To(s.getDebug).
+		Operation("getDebug"))
 	s.restfulCont.Add(ws)
 
 	ws = new(restful.WebService)
@@ -584,6 +604,8 @@ type execRequestParams struct {
 	podUID        types.UID
 	containerName string
 	cmd           []string
+	debugName     string
+	imageName     string
 }
 
 func getExecRequestParams(req *restful.Request) execRequestParams {
@@ -593,6 +615,8 @@ func getExecRequestParams(req *restful.Request) execRequestParams {
 		podUID:        types.UID(req.PathParameter("uid")),
 		containerName: req.PathParameter("containerName"),
 		cmd:           req.Request.URL.Query()[api.ExecCommandParam],
+		debugName:     req.Request.URL.Query().Get(api.ExecDebugNameParam),
+		imageName:     req.Request.URL.Query().Get(api.ExecImageParam),
 	}
 }
 
@@ -681,6 +705,76 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 		params.podUID,
 		params.containerName,
 		params.cmd,
+		streamOpts,
+		s.host.StreamingConnectionIdleTimeout(),
+		remotecommandconsts.DefaultStreamCreationTimeout,
+		remotecommandconsts.SupportedStreamingProtocols)
+}
+
+// getDebug handles requests to run a Debug Container in a pod
+func (s *Server) getDebug(request *restful.Request, response *restful.Response) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DebugContainers) {
+		err := fmt.Errorf("debug containers feature disabled")
+		utilruntime.HandleError(err)
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
+	params := getExecRequestParams(request)
+	if params.imageName == "" {
+		params.imageName = "busybox" // TODO(verb) make configurable
+	}
+
+	streamOpts, err := remotecommandserver.NewOptions(request.Request)
+	if err != nil {
+		utilruntime.HandleError(err)
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+	pod, ok := s.host.GetPodByName(params.podNamespace, params.podName)
+	if !ok {
+		response.WriteError(http.StatusNotFound, fmt.Errorf("pod does not exist"))
+		return
+	}
+
+	glog.V(5).Infof("Creating a Debug Container for %s/%s", pod.Name, params.containerName)
+	container := v1.Container{
+		Name:    params.debugName,
+		Command: params.cmd,
+		Image:   params.imageName,
+		Stdin:   true,
+		TTY:     true,
+		SecurityContext: &v1.SecurityContext{
+			Capabilities: &v1.Capabilities{
+				// These are the capabilities needed for strace and nsenter.
+				Add: []v1.Capability{"SYS_PTRACE", "SYS_ADMIN"},
+			},
+		},
+	}
+
+	if err := s.host.RunDebugContainer(pod, &container); err != nil {
+		utilruntime.HandleError(err)
+		response.WriteError(http.StatusInternalServerError, err)
+		return
+	}
+
+	podFullName := kubecontainer.GetPodFullName(pod)
+	redirect, err := s.host.GetAttach(podFullName, params.podUID, params.debugName, *streamOpts)
+	if err != nil {
+		streaming.WriteError(err, response.ResponseWriter)
+		return
+	}
+	if redirect != nil {
+		http.Redirect(response.ResponseWriter, request.Request, redirect.String(), http.StatusFound)
+		return
+	}
+
+	remotecommandserver.ServeAttach(response.ResponseWriter,
+		request.Request,
+		s.host,
+		podFullName,
+		params.podUID,
+		params.debugName,
 		streamOpts,
 		s.host.StreamingConnectionIdleTimeout(),
 		remotecommandconsts.DefaultStreamCreationTimeout,
