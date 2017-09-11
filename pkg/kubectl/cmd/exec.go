@@ -86,6 +86,8 @@ func NewCmdExec(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *c
 	cmd.Flags().StringVarP(&options.PodName, "pod", "p", "", "Pod name")
 	// TODO support UID
 	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", "", "Container name. If omitted, the first container in the pod will be chosen")
+	cmd.Flags().StringVarP(&options.DebugName, "debug", "d", "", "Debug Container name.")
+	cmd.Flags().StringVarP(&options.DebugImage, "image", "m", "", "Debug Container image.")
 	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", false, "Pass stdin to the container")
 	cmd.Flags().BoolVarP(&options.TTY, "tty", "t", false, "Stdin is a TTY")
 	return cmd
@@ -136,7 +138,9 @@ type StreamOptions struct {
 type ExecOptions struct {
 	StreamOptions
 
-	Command []string
+	Command    []string
+	DebugName  string
+	DebugImage string
 
 	FullCmdName       string
 	SuggestedCmdUsage string
@@ -314,12 +318,14 @@ func (p *ExecOptions) Run() error {
 			SubResource("exec").
 			Param("container", containerName)
 		req.VersionedParams(&api.PodExecOptions{
-			Container: containerName,
-			Command:   p.Command,
-			Stdin:     p.Stdin,
-			Stdout:    p.Out != nil,
-			Stderr:    p.Err != nil,
-			TTY:       t.Raw,
+			Container:  containerName,
+			Command:    p.Command,
+			Stdin:      p.Stdin,
+			Stdout:     p.Out != nil,
+			Stderr:     p.Err != nil,
+			TTY:        t.Raw,
+			AlphaName:  p.DebugName,
+			AlphaImage: p.DebugImage,
 		}, api.ParameterCodec)
 
 		return p.Executor.Execute("POST", req.URL(), p.Config, p.In, p.Out, p.Err, t.Raw, sizeQueue)
