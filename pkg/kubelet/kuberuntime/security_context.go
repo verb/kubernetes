@@ -51,7 +51,7 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 	synthesized.NamespaceOptions = &runtimeapi.NamespaceOption{
 		HostNetwork: pod.Spec.HostNetwork,
 		HostIpc:     pod.Spec.HostIPC,
-		HostPid:     pod.Spec.HostPID,
+		Pid:         getPIDNamespaceForPod(pod),
 	}
 	podSc := pod.Spec.SecurityContext
 	if podSc != nil {

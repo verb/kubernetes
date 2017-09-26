@@ -174,12 +174,18 @@ message Mount {
     MountPropagation propagation = 5;
 }
 
+enum PIDNamespace {
+    ISOLATED = 0;
+    HOST     = 1;
+    SHARED   = 2;
+}
+
 // NamespaceOption provides options for Linux namespaces.
 message NamespaceOption {
     // If set, use the host's network namespace.
     bool host_network = 1;
     // If set, use the host's PID namespace.
-    bool host_pid = 2;
+    PIDNamespace pid = 2;
     // If set, use the host's IPC namespace.
     bool host_ipc = 3;
 }
