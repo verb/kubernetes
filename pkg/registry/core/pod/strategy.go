@@ -417,11 +417,11 @@ func streamParams(params url.Values, opts runtime.Object) error {
 		for _, c := range opts.Command {
 			params.Add("command", c)
 		}
-		if opts.AlphaName != "" {
-			params.Add(api.ExecDebugNameParam, opts.AlphaName)
+		if opts.AlphaEphemeralContainer.Name != "" {
+			params.Add(api.ExecDebugNameParam, opts.AlphaEphemeralContainer.Name)
 		}
-		if opts.AlphaImage != "" {
-			params.Add(api.ExecImageParam, opts.AlphaImage)
+		if opts.AlphaEphemeralContainer.Image != "" {
+			params.Add(api.ExecImageParam, opts.AlphaEphemeralContainer.Image)
 		}
 	case *api.PodAttachOptions:
 		if opts.Stdin {
@@ -472,11 +472,12 @@ func ExecLocation(
 	opts *api.PodExecOptions,
 ) (*url.URL, http.RoundTripper, error) {
 	kubeletPath := "exec"
-	if opts.AlphaName != "" || opts.AlphaImage != "" {
+	// BROKEN: opts.AlphaEphemeralContainer has not been populated from HTTP params
+	if opts.AlphaEphemeralContainer.Name != "" || opts.AlphaEphemeralContainer.Image != "" {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.DebugContainers) {
 			return nil, nil, errors.NewBadRequest("debug containers feature disabled")
 		}
-		if opts.AlphaName == "" {
+		if opts.AlphaEphemeralContainer.Name == "" {
 			// TODO(verb): consider allowing either and defaulting/generating the other
 			return nil, nil, errors.NewBadRequest("Name required when Image specified")
 		}
