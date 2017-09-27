@@ -2580,6 +2580,17 @@ message PodCondition {
   optional string message = 6;
 }
 
+message PodExecEphemeralContainerSpec {
+  // Name is the name of the Debug Container. Its presence will cause
+  // exec to create a Debug Container rather than performing a runtime exec.
+  optional string name = 1;
+
+  // Image is an optional container image name that will be used to for the Debug
+  // Container in the specified Pod with Command as ENTRYPOINT. If omitted a
+  // default image will be used.
+  optional string image = 2;
+}
+
 // PodExecOptions is the query options to a Pod's remote exec call.
 // ---
 // TODO: This is largely identical to PodAttachOptions above, make sure they stay in sync and see about merging
@@ -2613,14 +2624,7 @@ message PodExecOptions {
   // Command is the remote command to execute. argv array. Not executed within a shell.
   repeated string command = 6;
 
-  // Name is the name of the Debug Container. Its presence will cause
-  // exec to create a Debug Container rather than performing a runtime exec.
-  optional string name = 7;
-
-  // Image is an optional container image name that will be used to for the Debug
-  // Container in the specified Pod with Command as ENTRYPOINT. If omitted a
-  // default image will be used.
-  optional string image = 8;
+  optional PodExecEphemeralContainerSpec alphaEphemeralContainer = 7;
 }
 
 // PodList is a list of Pods.
