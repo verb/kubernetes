@@ -144,7 +144,7 @@ func modifyContainerNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, podSand
 // modifyCommonNamespaceOptions apply common namespace options for sandbox and container
 func modifyCommonNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, hostConfig *dockercontainer.HostConfig) {
 	if nsOpts != nil {
-		if nsOpts.GetPid() == runtimeapi.PIDNamespace_HOST {
+		if nsOpts.GetPid() == runtimeapi.NamespaceMode_NODE {
 			hostConfig.PidMode = namespaceModeHost
 		}
 		if nsOpts.HostIpc {

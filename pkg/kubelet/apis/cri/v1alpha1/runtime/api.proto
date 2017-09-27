@@ -174,10 +174,11 @@ message Mount {
     MountPropagation propagation = 5;
 }
 
-enum PIDNamespace {
-    ISOLATED = 0;
-    HOST     = 1;
-    SHARED   = 2;
+enum NamespaceMode {
+    CONTAINER = 0;
+    NODE      = 1;
+    POD       = 2;
+    TARGET    = 3;
 }
 
 // NamespaceOption provides options for Linux namespaces.
@@ -185,9 +186,11 @@ message NamespaceOption {
     // If set, use the host's network namespace.
     bool host_network = 1;
     // If set, use the host's PID namespace.
-    PIDNamespace pid = 2;
+    NamespaceMode pid = 2;
     // If set, use the host's IPC namespace.
     bool host_ipc = 3;
+    // Target Container or Sandbox ID for NamespaceMode == TARGET
+    string target_id = 4;
 }
 
 // Int64Value is the wrapper of int64.

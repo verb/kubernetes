@@ -284,9 +284,9 @@ func (m *kubeGenericRuntimeManager) getSeccompProfileFromAnnotations(annotations
 	return profile
 }
 
-func getPIDNamespaceForPod(pod *v1.Pod) runtimeapi.PIDNamespace {
+func getPIDNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
 	if pod.Spec.HostPID {
-		return runtimeapi.PIDNamespace_HOST
+		return runtimeapi.NamespaceMode_NODE
 	}
-	return runtimeapi.PIDNamespace_ISOLATED
+	return runtimeapi.NamespaceMode_CONTAINER
 }

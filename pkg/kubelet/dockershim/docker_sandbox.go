@@ -591,11 +591,11 @@ func sharesHostNetwork(container *dockertypes.ContainerJSON) bool {
 }
 
 // pidNamespace returns the PID Namespace mode of the given container
-func pidNamespace(container *dockertypes.ContainerJSON) runtimeapi.PIDNamespace {
+func pidNamespace(container *dockertypes.ContainerJSON) runtimeapi.NamespaceMode {
 	if container != nil && container.HostConfig != nil && string(container.HostConfig.PidMode) == namespaceModeHost {
-		return runtimeapi.PIDNamespace_HOST
+		return runtimeapi.NamespaceMode_NODE
 	}
-	return runtimeapi.PIDNamespace_ISOLATED
+	return runtimeapi.NamespaceMode_CONTAINER
 }
 
 // sharesHostIpc returns true if the given container is sharing the host's ipc

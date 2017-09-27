@@ -256,7 +256,7 @@ func TestModifySandboxNamespaceOptions(t *testing.T) {
 		{
 			name: "NamespaceOption.HostPid",
 			nsOpt: &runtimeapi.NamespaceOption{
-				Pid: runtimeapi.PIDNamespace_HOST,
+				Pid: runtimeapi.NamespaceMode_NODE,
 			},
 			expected: &dockercontainer.HostConfig{
 				PidMode:     namespaceModeHost,
@@ -306,7 +306,7 @@ func TestModifyContainerNamespaceOptions(t *testing.T) {
 		{
 			name: "NamespaceOption.HostPid",
 			nsOpt: &runtimeapi.NamespaceOption{
-				Pid: runtimeapi.PIDNamespace_HOST,
+				Pid: runtimeapi.NamespaceMode_NODE,
 			},
 			expected: &dockercontainer.HostConfig{
 				NetworkMode: dockercontainer.NetworkMode(sandboxNSMode),
