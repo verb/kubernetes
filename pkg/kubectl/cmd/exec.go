@@ -318,16 +318,19 @@ func (p *ExecOptions) Run() error {
 			SubResource("exec").
 			Param("container", containerName)
 		req.VersionedParams(&api.PodExecOptions{
-			Container:  containerName,
-			Command:    p.Command,
-			Stdin:      p.Stdin,
-			Stdout:     p.Out != nil,
-			Stderr:     p.Err != nil,
-			TTY:        t.Raw,
-			AlphaName:  p.DebugName,
-			AlphaImage: p.DebugImage,
+			Container: containerName,
+			Command:   p.Command,
+			Stdin:     p.Stdin,
+			Stdout:    p.Out != nil,
+			Stderr:    p.Err != nil,
+			TTY:       t.Raw,
+			AlphaEphemeralContainer: api.PodExecEphemeralContainerSpec{
+				Name:  p.DebugName,
+				Image: p.DebugImage,
+			},
 		}, api.ParameterCodec)
 
+		fmt.Println("url is ", req.URL())
 		return p.Executor.Execute("POST", req.URL(), p.Config, p.In, p.Out, p.Err, t.Raw, sizeQueue)
 	}
 
