@@ -17,6 +17,7 @@ limitations under the License.
 package pod
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -36,7 +37,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
+	apifeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -46,6 +47,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 )
 
@@ -101,7 +103,7 @@ func (podStrategy) AllowCreateOnUpdate() bool {
 }
 
 func isUpdatingUninitializedPod(old runtime.Object) (bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.Initializers) {
+	if !utilfeature.DefaultFeatureGate.Enabled(apifeatures.Initializers) {
 		return false, nil
 	}
 	oldMeta, err := meta.Accessor(old)
@@ -396,6 +398,18 @@ func podHasContainerWithName(pod *api.Pod, containerName string) bool {
 			return true
 		}
 	}
+	// Debug Containers are implemented as kubelet-specific annotation
+	if utilfeature.DefaultFeatureGate.Enabled(features.DebugContainers) {
+		// TODO(verb): Replace with an actual update to the API or annotation support in the api machinery
+		if containerJSON, ok := pod.Annotations["kubelet.alpha.kubernetes.io/debug-container"]; ok {
+			var c api.Container
+			if err := json.Unmarshal([]byte(containerJSON), &c); err != nil {
+				return false
+			}
+			return containerName == c.Name
+		}
+	}
+
 	return false
 }
 

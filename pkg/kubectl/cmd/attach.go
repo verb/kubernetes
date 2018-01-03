@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -56,8 +57,9 @@ var (
 )
 
 const (
-	defaultPodAttachTimeout = 60 * time.Second
-	defaultPodLogsTimeout   = 20 * time.Second
+	debugContainerAnnotationKey = "kubelet.alpha.kubernetes.io/debug-container"
+	defaultPodAttachTimeout     = 60 * time.Second
+	defaultPodLogsTimeout       = 20 * time.Second
 )
 
 func NewCmdAttach(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
@@ -308,6 +310,20 @@ func (p *AttachOptions) containerToAttachTo(pod *api.Pod) (*api.Container, error
 				return &pod.Spec.InitContainers[i], nil
 			}
 		}
+
+		// Debug Containers are attachable but currently exist only as an annotation
+		// If the annotation exists but the DebugContainers feature is disabled then
+		// the apiserver will reject this attach.
+		if containerJSON, ok := pod.Annotations[debugContainerAnnotationKey]; ok {
+			var c api.Container
+			if err := json.Unmarshal([]byte(containerJSON), &c); err != nil {
+				return nil, fmt.Errorf("error parsing JSON for debug container: %v", err)
+			}
+			if c.Name == p.ContainerName {
+				return &c, nil
+			}
+		}
+
 		return nil, fmt.Errorf("container not found (%s)", p.ContainerName)
 	}
 
