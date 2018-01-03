@@ -88,6 +88,12 @@ type FakeIndirectStreamingRuntime struct {
 
 var _ IndirectStreamingRuntime = &FakeIndirectStreamingRuntime{}
 
+type FakeDebugContainerRunner struct {
+	*FakeRuntime
+}
+
+var _ DebugContainerRunner = &FakeDebugContainerRunner{}
+
 // FakeRuntime should implement Runtime.
 var _ Runtime = &FakeRuntime{}
 
@@ -477,6 +483,14 @@ func (f *FakeIndirectStreamingRuntime) GetPortForward(podName, podNamespace stri
 
 	f.CalledFunctions = append(f.CalledFunctions, "GetPortForward")
 	return &url.URL{Host: FakeHost}, f.Err
+}
+
+func (f *FakeDebugContainerRunner) RunDebugContainer(pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret) error {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "RunDebugContainer")
+	return f.Err
 }
 
 type FakeContainerCommandRunner struct {

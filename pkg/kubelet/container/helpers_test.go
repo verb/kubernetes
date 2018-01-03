@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 func TestEnvVarsToMap(t *testing.T) {
@@ -304,5 +305,44 @@ func TestMakePortMappings(t *testing.T) {
 	for i, tt := range tests {
 		actual := MakePortMappings(tt.container)
 		assert.Equal(t, tt.expectedPortMappings, actual, "[%d]", i)
+	}
+}
+
+func TestGetDebugContainerSpecFromAnnotations(t *testing.T) {
+	utilfeature.DefaultFeatureGate.Set("DebugContainers=True")
+	defer utilfeature.DefaultFeatureGate.Set("DebugContainers=False")
+	tests := []struct {
+		annotations       map[string]string
+		expectedContainer *v1.Container
+	}{
+		{
+			map[string]string{
+				DebugContainerAnnotationKey: `{
+				"name": "debug",
+				"image": "busybox",
+				"command": ["sh"],
+				"stdin": true,
+				"tty": true
+			}`,
+			},
+			&v1.Container{
+				Name:    "debug",
+				Image:   "busybox",
+				Command: []string{"sh"},
+				Stdin:   true,
+				TTY:     true,
+			},
+		},
+		{
+			map[string]string{
+				DebugContainerAnnotationKey: "invalid_json",
+			},
+			nil,
+		},
+	}
+
+	for i, test := range tests {
+		actualContainer := GetDebugContainerSpecFromAnnotations(test.annotations)
+		assert.Equal(t, test.expectedContainer, actualContainer, "TestCase[%d]", i)
 	}
 }

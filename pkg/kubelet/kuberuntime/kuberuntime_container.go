@@ -39,6 +39,8 @@ import (
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -456,6 +458,7 @@ func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName strin
 			ID:   status.Id,
 		},
 		Name:         labeledInfo.ContainerName,
+		Type:         labeledInfo.ContainerType,
 		Image:        status.Image.Image,
 		ImageID:      status.ImageRef,
 		Hash:         annotatedInfo.Hash,
@@ -534,6 +537,12 @@ func (m *kubeGenericRuntimeManager) restoreSpecsFromContainerLabels(containerID 
 			TerminationGracePeriodSeconds: a.PodTerminationGracePeriod,
 		},
 	}
+
+	// If the container spec was stored as a runtime label then we're finished.
+	if l.ContainerSpec != nil {
+		return pod, l.ContainerSpec, nil
+	}
+
 	container = &v1.Container{
 		Name:  l.ContainerName,
 		Ports: a.ContainerPorts,
@@ -550,6 +559,7 @@ func (m *kubeGenericRuntimeManager) restoreSpecsFromContainerLabels(containerID 
 // killContainer kills a container through the following steps:
 // * Run the pre-stop lifecycle hooks (if applicable).
 // * Stop the container.
+// TODO(verb): test for debug containers (and debug container with nil pod)
 func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubecontainer.ContainerID, containerName string, reason string, gracePeriodOverride *int64) error {
 	var containerSpec *v1.Container
 	if pod != nil {
@@ -557,16 +567,23 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 			return fmt.Errorf("failed to get containerSpec %q(id=%q) in pod %q when killing container for reason %q",
 				containerName, containerID.String(), format.Pod(pod), reason)
 		}
-	} else {
+	}
+	if pod == nil || containerSpec == nil {
 		// Restore necessary information if one of the specs is nil.
 		restoredPod, restoredContainer, err := m.restoreSpecsFromContainerLabels(containerID)
 		if err != nil {
 			return err
 		}
-		pod, containerSpec = restoredPod, restoredContainer
+		if pod == nil {
+			pod = restoredPod
+		}
+		if containerSpec == nil {
+			containerSpec = restoredContainer
+		}
 	}
 
-	// From this point , pod and container must be non-nil.
+	// From this point pod and container MUST be non-nil.
+
 	gracePeriod := int64(minimumGracePeriodInSeconds)
 	switch {
 	case pod.DeletionGracePeriodSeconds != nil:
@@ -807,6 +824,45 @@ func (m *kubeGenericRuntimeManager) RunInContainer(id kubecontainer.ContainerID,
 	// for logging purposes. A combined output option will need to be added to the ExecSyncRequest
 	// if more precise output ordering is ever required.
 	return append(stdout, stderr...), err
+}
+
+// RunDebugContainer creates a Debug Container described by container in pod if it is not
+// already running. The container configuration does not become part of the pod spec, but its
+// status is reported in PodStatus. Return success if the debug container is already running.
+func (m *kubeGenericRuntimeManager) RunDebugContainer(pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DebugContainers) {
+		return errors.New("Debug Containers feature disabled")
+	}
+
+	if kubecontainer.GetContainerSpec(pod, container.Name) != nil {
+		return fmt.Errorf("container name %s conflicts with container in pod spec", container.Name)
+	}
+
+	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	if err != nil {
+		return err
+	} else if len(podStatus.SandboxStatuses) == 0 {
+		return fmt.Errorf("pod %v/%v not running", pod.Namespace, pod.Name)
+	}
+
+	// We haven't reached consensus yet on how to handle reattaching, so in the mean time RunDebugContainer()
+	// returns success if the container already exists and is running. getDebug() will then implicitly reattach.
+	for _, c := range podStatus.ContainerStatuses {
+		if c.Name == container.Name && c.State == kubecontainer.ContainerStateRunning {
+			return nil
+		}
+	}
+
+	podSandboxConfig, err := m.generatePodSandboxConfig(pod, 0)
+	if err != nil {
+		return err
+	}
+
+	if msg, err := m.startContainer(podStatus.SandboxStatuses[0].Id, podSandboxConfig, container, pod, podStatus, pullSecrets, podStatus.IP, kubecontainer.ContainerTypeDebug); err != nil {
+		return fmt.Errorf("cannot start debug container: %v (%v)", err, msg)
+	}
+
+	return nil
 }
 
 // removeContainer removes the container and the container logs.

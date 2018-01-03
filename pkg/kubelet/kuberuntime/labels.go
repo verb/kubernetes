@@ -58,6 +58,7 @@ type annotatedPodSandboxInfo struct {
 
 type labeledContainerInfo struct {
 	ContainerName string
+	ContainerSpec *v1.Container
 	ContainerType kubecontainer.ContainerType
 	PodName       string
 	PodNamespace  string
@@ -105,6 +106,15 @@ func newContainerLabels(container *v1.Container, pod *v1.Pod, containerType kube
 	labels[types.KubernetesContainerNameLabel] = container.Name
 	if utilfeature.DefaultFeatureGate.Enabled(features.DebugContainers) {
 		labels[types.KubernetesContainerTypeLabel] = string(containerType)
+		// It might be useful to store the spec for every container, but for now only store spec for debug containers
+		if containerType == kubecontainer.ContainerTypeDebug {
+			if containerJSON, e := json.Marshal(container); e != nil {
+				// TODO(verb): be sure this fails the request
+				glog.Errorf("Unable to marshal %v container %q of pod %v: %v", containerType, container, pod.Name, e)
+			} else {
+				labels[types.KubernetesContainerSpecLabel] = string(containerJSON)
+			}
+		}
 	}
 
 	return labels
@@ -175,15 +185,31 @@ func getPodSandboxInfoFromAnnotations(annotations map[string]string) *annotatedP
 
 // getContainerInfoFromLabels gets labeledContainerInfo from labels.
 func getContainerInfoFromLabels(labels map[string]string) *labeledContainerInfo {
-	var containerType kubecontainer.ContainerType
+	// Ensure that ContainerSpec & ContainerType are never set when DebugContainers is disabled,
+	// even if the container was created when the Feature was enabled.
+	var (
+		containerSpec *v1.Container
+		containerType kubecontainer.ContainerType
+	)
 	if utilfeature.DefaultFeatureGate.Enabled(features.DebugContainers) {
 		containerType = kubecontainer.ContainerType(getStringValueFromLabel(labels, types.KubernetesContainerTypeLabel))
+		if containerJSON := getStringValueFromLabel(labels, types.KubernetesContainerSpecLabel); containerJSON != "" {
+			var c v1.Container
+			if err := json.Unmarshal([]byte(containerJSON), &c); err != nil {
+				glog.Infof("Error parsing JSON for debug container: %v", err)
+				// Fall through, leaving containerType nil
+			} else {
+				containerSpec = &c
+			}
+		}
 	}
+
 	return &labeledContainerInfo{
 		PodName:       getStringValueFromLabel(labels, types.KubernetesPodNameLabel),
 		PodNamespace:  getStringValueFromLabel(labels, types.KubernetesPodNamespaceLabel),
 		PodUID:        kubetypes.UID(getStringValueFromLabel(labels, types.KubernetesPodUIDLabel)),
 		ContainerName: getStringValueFromLabel(labels, types.KubernetesContainerNameLabel),
+		ContainerSpec: containerSpec,
 		ContainerType: containerType,
 	}
 }
@@ -230,6 +256,7 @@ func getStringValueFromLabel(labels map[string]string, label string) string {
 	if value, found := labels[label]; found {
 		return value
 	}
+	// TODO(verb): remove error: Container doesn't have label io.kubernetes.container.spec, it may be an old or invalid container
 	// Do not report error, because there should be many old containers without label now.
 	glog.V(3).Infof("Container doesn't have label %s, it may be an old or invalid container", label)
 	// Return empty string "" for these containers, the caller will get value by other ways.

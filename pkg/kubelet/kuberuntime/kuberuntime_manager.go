@@ -122,6 +122,7 @@ type KubeGenericRuntime interface {
 	kubecontainer.Runtime
 	kubecontainer.IndirectStreamingRuntime
 	kubecontainer.ContainerCommandRunner
+	kubecontainer.DebugContainerRunner
 }
 
 // LegacyLogProvider gives the ability to use unsupported docker log drivers (e.g. journald)
@@ -354,9 +355,10 @@ type containerToKillInfo struct {
 	message string
 }
 
-// podActions keeps information what to do for a pod.
+// podActions keeps information what to do for a pod based on its spec.
+// Note that podActions will not affect Debug Containers since they are not part of the spec.
 type podActions struct {
-	// Stop all running (regular and init) containers and the sandbox for the pod.
+	// Stop all running (regular, init and debug) containers and the sandbox for the pod.
 	KillPod bool
 	// Whether need to create a new sandbox. If needed to kill pod and create a
 	// a new pod sandbox, all init containers need to be purged (i.e., removed).
@@ -438,6 +440,8 @@ func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) boo
 }
 
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
+// Since changes are based on the pod spec, they exclude Debug Containers, which are not in the spec.
+// TODO(verb): add test to make sure doesn't kill debug containers
 func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *kubecontainer.PodStatus) podActions {
 	glog.V(5).Infof("Syncing Pod %q: %+v", format.Pod(pod), pod)
 
@@ -565,6 +569,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 //  4. Create sandbox if necessary.
 //  5. Create init containers.
 //  6. Create normal containers.
+//  7. Create debug container.
 func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
 	// Step 1: Compute sandbox and container changes.
 	podContainerChanges := m.computePodActions(pod, podStatus)
@@ -734,6 +739,33 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 				utilruntime.HandleError(fmt.Errorf("container start failed: %v: %s", err, msg))
 			}
 			continue
+		}
+	}
+
+	// Step 7: start debug container
+	// Eventually Debug Containers will instead be started using the kubelet API, but until the API
+	// review is complete a single Debug Container can be created using an annotation.
+	// TODO(verb): shut down debug container without waiting if pod is exiting
+	if container := kubecontainer.GetDebugContainerSpecFromAnnotations(pod.Annotations); container != nil {
+		// TODO(verb): check for conflict with name from container spec
+		containerStatus := podStatus.FindContainerStatusByName(container.Name)
+		if containerStatus == nil {
+			// TODO(verb): make sure never restarts
+			startContainerResult := kubecontainer.NewSyncResult(kubecontainer.StartContainer, container.Name)
+			result.AddSyncResult(startContainerResult)
+
+			glog.V(4).Infof("Creating debug container %+v in pod %v", container, format.Pod(pod))
+			if msg, err := m.startContainer(podSandboxID, podSandboxConfig, container, pod, podStatus, pullSecrets, podIP, kubecontainer.ContainerTypeDebug); err != nil {
+				startContainerResult.Fail(err, msg)
+				// known errors that are logged in other places are logged at higher levels here to avoid
+				// repetitive log spam
+				switch {
+				case err == images.ErrImagePullBackOff:
+					glog.V(3).Infof("container start failed: %v: %s", err, msg)
+				default:
+					utilruntime.HandleError(fmt.Errorf("container start failed: %v: %s", err, msg))
+				}
+			}
 		}
 	}
 

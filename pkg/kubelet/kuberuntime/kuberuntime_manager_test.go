@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	apitest "k8s.io/kubernetes/pkg/kubelet/apis/cri/testing"
@@ -37,6 +38,14 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 )
+
+const debugContainerJSON = `{
+	"name": "debug",
+	"image": "busybox",
+	"command": ["sh"],
+	"stdin": true,
+	"tty": true
+	}`
 
 var (
 	fakeCreatedAt int64 = 1
@@ -557,9 +566,10 @@ func TestSyncPod(t *testing.T) {
 	}
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			UID:       "12345678",
-			Name:      "foo",
-			Namespace: "new",
+			UID:         "12345678",
+			Name:        "foo",
+			Namespace:   "new",
+			Annotations: make(map[string]string),
 		},
 		Spec: v1.PodSpec{
 			Containers: containers,
@@ -578,6 +588,18 @@ func TestSyncPod(t *testing.T) {
 	for _, c := range fakeRuntime.Containers {
 		assert.Equal(t, runtimeapi.ContainerState_CONTAINER_RUNNING, c.State)
 	}
+
+	// Check that SyncPod doesn't kill a Debug Container
+	utilfeature.DefaultFeatureGate.Set("DebugContainers=True")
+	defer utilfeature.DefaultFeatureGate.Set("DebugContainers=False")
+
+	debugContainer := makeTestContainer("debug", "busybox")
+	err = m.RunDebugContainer(pod, &debugContainer, nil)
+	assert.NoError(t, err, "create debug container")
+	assert.Equal(t, 3, len(fakeRuntime.Containers), "debug container running")
+	result = m.SyncPod(pod, v1.PodStatus{}, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
+	assert.NoError(t, result.Error(), "SyncPod with debug container")
+	assert.Equal(t, 3, len(fakeRuntime.Containers), "SyncPod did not stop debug container")
 }
 
 func TestPruneInitContainers(t *testing.T) {
@@ -769,6 +791,9 @@ func makeBasePodAndStatus() (*v1.Pod, *kubecontainer.PodStatus) {
 }
 
 func TestComputePodActions(t *testing.T) {
+	utilfeature.DefaultFeatureGate.Set("DebugContainers=True")
+	defer utilfeature.DefaultFeatureGate.Set("DebugContainers=False")
+
 	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
@@ -905,6 +930,13 @@ func TestComputePodActions(t *testing.T) {
 			},
 			// TODO: Add a test case for containers which failed the liveness
 			// check. Will need to fake the livessness check result.
+		},
+		"Do not kill a running Debug Container": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Annotations = make(map[string]string)
+				pod.Annotations[kubecontainer.DebugContainerAnnotationKey] = debugContainerJSON
+			},
+			actions: noAction,
 		},
 	} {
 		pod, status := makeBasePodAndStatus()

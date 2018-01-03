@@ -26,6 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -300,7 +302,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsUser = nil
 	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsNonRoot = &runAsNonRootTrue
 
-	_, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image)
+	_, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, kubecontainer.ContainerTypeRegular)
 	assert.Error(t, err, "RunAsNonRoot should fail for non-numeric username")
 }
 
@@ -433,4 +435,99 @@ func TestLifeCycleHook(t *testing.T) {
 		}
 
 	})
+}
+
+func podDebugTarget(name string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       types.UID(name + "12345678"),
+			Name:      name,
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "existingcontainer",
+					Image:           "application",
+					ImagePullPolicy: v1.PullIfNotPresent,
+				},
+			},
+		},
+	}
+}
+
+// TestRunDebugContainer tests creating and starting a Debug Container in a pod
+func TestRunDebugContainer(t *testing.T) {
+	utilfeature.DefaultFeatureGate.Set("DebugContainers=True")
+	defer utilfeature.DefaultFeatureGate.Set("DebugContainers=False")
+
+	existingPodName := "targetpod"
+	testcases := []struct {
+		description string
+		targetPod   *v1.Pod
+		container   v1.Container
+		expectError bool
+	}{{
+		"success case",
+		podDebugTarget(existingPodName),
+		v1.Container{
+			Name:            "debug",
+			Image:           "busybox",
+			ImagePullPolicy: v1.PullIfNotPresent,
+		},
+		false,
+	}, {
+		"no such pod",
+		podDebugTarget("otherpod"),
+		v1.Container{
+			Name:            "debug",
+			Image:           "busybox",
+			ImagePullPolicy: v1.PullIfNotPresent,
+		},
+		true,
+	}, {
+		"container spec collision",
+		podDebugTarget(existingPodName),
+		v1.Container{
+			Name:            "existingcontainer",
+			Image:           "busybox",
+			ImagePullPolicy: v1.PullIfNotPresent,
+		},
+		true,
+	}}
+
+	for _, tc := range testcases {
+		fakeRuntime, _, m, err := createTestRuntimeManager()
+		assert.NoError(t, err, tc.description)
+		makeAndSetFakePod(t, m, fakeRuntime, podDebugTarget(existingPodName))
+
+		if err := m.RunDebugContainer(tc.targetPod, &tc.container, nil); tc.expectError {
+			assert.Error(t, err, tc.description)
+		} else {
+			assert.NoError(t, err)
+
+			// Verify debug container is started
+			assert.Contains(t, fakeRuntime.Called, "CreateContainer", tc.description)
+			assert.Contains(t, fakeRuntime.Called, "StartContainer", tc.description)
+		}
+	}
+}
+
+// TestRunDebugContainerDisabled tests that debug containers cannot be created if disabled
+func TestRunDebugContainerDisabled(t *testing.T) {
+	utilfeature.DefaultFeatureGate.Set("DebugContainers=False")
+	fakeRuntime, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	pod := podDebugTarget("pod")
+	makeAndSetFakePod(t, m, fakeRuntime, pod)
+
+	debugContainer := &v1.Container{
+		Name:            "debug",
+		Image:           "busybox",
+		ImagePullPolicy: v1.PullIfNotPresent,
+	}
+	err = m.RunDebugContainer(pod, debugContainer, nil)
+	assert.Error(t, err)
+	assert.NoError(t, fakeRuntime.AssertCalls([]string{"Version"})) // "Version" is always called
 }

@@ -18,6 +18,7 @@ package container
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"hash/adler32"
 	"hash/fnv"
@@ -30,12 +31,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/features"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
+)
+
+const (
+	// TODO(verb): Should be part of the core API
+	DebugContainerAnnotationKey = "kubelet.alpha.kubernetes.io/debug-container"
 )
 
 // HandlerRunner runs a lifecycle handler for a container.
@@ -297,7 +305,30 @@ func GetContainerSpec(pod *v1.Pod, containerName string) *v1.Container {
 			return &pod.Spec.InitContainers[i]
 		}
 	}
+	// TODO(verb): get v1.Container from PodStatus
+	if c := GetDebugContainerSpecFromAnnotations(pod.Annotations); c != nil && containerName == c.Name {
+		return c
+	}
 	return nil
+}
+
+func GetDebugContainerSpecFromAnnotations(annotations map[string]string) *v1.Container {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DebugContainers) {
+		return nil
+	}
+
+	containerJSON, ok := annotations[DebugContainerAnnotationKey]
+	if !ok {
+		return nil
+	}
+
+	var c v1.Container
+	if err := json.Unmarshal([]byte(containerJSON), &c); err != nil {
+		glog.Infof("Error parsing JSON for debug container: %v", err)
+		return nil
+	}
+
+	return &c
 }
 
 // HasPrivilegedContainer returns true if any of the containers in the pod are privileged.

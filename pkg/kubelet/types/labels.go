@@ -21,6 +21,7 @@ const (
 	KubernetesPodNamespaceLabel  = "io.kubernetes.pod.namespace"
 	KubernetesPodUIDLabel        = "io.kubernetes.pod.uid"
 	KubernetesContainerNameLabel = "io.kubernetes.container.name"
+	KubernetesContainerSpecLabel = "io.kubernetes.container.spec"
 	KubernetesContainerTypeLabel = "io.kubernetes.container.type"
 )
 

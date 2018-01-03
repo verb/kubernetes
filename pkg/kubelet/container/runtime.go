@@ -170,6 +170,14 @@ type ContainerCommandRunner interface {
 	RunInContainer(id ContainerID, cmd []string, timeout time.Duration) ([]byte, error)
 }
 
+type DebugContainerRunner interface {
+	// RunDebugContainer runs a new container in the specified pod.  This "Debug Container" is
+	// created by an API call and inserted into an already running pod to enable troubleshooting
+	// of that pod. The container configuration does not become part of the pod spec, but its
+	// status is reported in PodStatus. Debug containers are not restarted automatically.
+	RunDebugContainer(pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret) error
+}
+
 // Pod is a group of containers.
 type Pod struct {
 	// The ID of the pod, which can be used to retrieve a particular pod
@@ -268,6 +276,7 @@ const (
 type ContainerType string
 
 const (
+	ContainerTypeDebug   ContainerType = "DEBUG"
 	ContainerTypeInit    ContainerType = "INIT"
 	ContainerTypeRegular ContainerType = "REGULAR"
 )
@@ -341,6 +350,9 @@ type ContainerStatus struct {
 	// Message written by the container before exiting (stored in
 	// TerminationMessagePath).
 	Message string
+	// Type of this container (e.g. "REGULAR" or "INIT") which is used by the kublet to
+	// differentiate containers that have a status but no spec (e.g. "DEBUG" containers).
+	Type ContainerType
 }
 
 // FindContainerStatusByName returns container status in the pod status with the given name.

@@ -1642,6 +1642,30 @@ func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port int32,
 	return streamingRuntime.PortForward(&pod, port, stream)
 }
 
+func (kl *Kubelet) RunDebugContainer(pod *v1.Pod, container *v1.Container) error {
+	// Only the generic runtime manager supports Debug Containers
+	r, ok := kl.containerRuntime.(kubecontainer.DebugContainerRunner)
+	if !ok {
+		return fmt.Errorf("runtime %v does not support debug containers", kl.containerRuntime.Type())
+	}
+
+	if err := r.RunDebugContainer(pod, container, kl.getPullSecretsForPod(pod)); err != nil {
+		return err
+	}
+
+	// Schedule a sync so that the api server gets a ContainerStatus as soon as possible.
+	// We don't rely on the apiserver having up-to-date status, but it's nice.
+	glog.V(5).Infof("Scheduling sync of new Debug Container %s in pod %s", container.Name, pod.Name)
+	mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
+	kl.podWorkers.UpdatePod(&UpdatePodOptions{
+		Pod:        pod,
+		MirrorPod:  mirrorPod,
+		UpdateType: kubetypes.SyncPodSync,
+	})
+
+	return nil
+}
+
 // GetExec gets the URL the exec will be served from, or nil if the Kubelet will serve it.
 func (kl *Kubelet) GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error) {
 	switch streamingRuntime := kl.containerRuntime.(type) {
