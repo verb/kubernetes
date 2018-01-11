@@ -3001,6 +3001,30 @@ type PodDNSConfigOption struct {
 	Value *string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// EphemeralContainer describes a container to attach to a running pod for troubleshooting.
+type EphemeralContainer struct {
+	metav1.TypeMeta `json:",inline"`
+	// TODO(verb): Maybe don't need
+	//metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Spec describes the Ephemeral Container to be created.
+	Spec *Container `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+
+	// Most recently observed status of the container.
+	// This data may not be up to date.
+	// Populated by the system.
+	// Read-only.
+	// +optional
+	Status *ContainerStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+
+	// If set, the name of the container from PodSpec that this ephemeral container targets.
+	// If not set then the ephemeral container is run in whatever namespaces are shared
+	// for the pod.
+	TargetContainerName string `json:"targetContainerName,omitempty" protobuf:"bytes,4,opt,name=targetContainerName"`
+}
+
 // PodStatus represents information about the status of a pod. Status may trail the actual
 // state of a system.
 type PodStatus struct {
@@ -3051,6 +3075,10 @@ type PodStatus struct {
 	// More info: https://git.k8s.io/community/contributors/design-proposals/node/resource-qos.md
 	// +optional
 	QOSClass PodQOSClass `json:"qosClass,omitempty" protobuf:"bytes,9,rep,name=qosClass"`
+
+	// List of user-initiated ephemeral containers that have been run in this pod.
+	// +optional
+	EphemeralContainers []EphemeralContainer `json:"commands,omitempty" protobuf:"bytes,11,rep,name=ephemeralContainers"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

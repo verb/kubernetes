@@ -2711,6 +2711,28 @@ type PodDNSConfigOption struct {
 	Value *string
 }
 
+// EphemeralContainer describes a container to attach to a running pod for troubleshooting.
+type EphemeralContainer struct {
+	metav1.TypeMeta
+	// TODO(verb): Maybe don't need
+	//metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Spec describes the Ephemeral Container to be created.
+	Spec *Container
+
+	// Most recently observed status of the container.
+	// This data may not be up to date.
+	// Populated by the system.
+	// Read-only.
+	// +optional
+	Status *ContainerStatus
+
+	// If set, the name of the container from PodSpec that this ephemeral container targets.
+	// If not set then the ephemeral container is run in whatever namespaces are shared
+	// for the pod.
+	TargetContainerName string
+}
+
 // PodStatus represents information about the status of a pod. Status may trail the actual
 // state of a system.
 type PodStatus struct {
@@ -2749,6 +2771,10 @@ type PodStatus struct {
 	// when we have done this.
 	// +optional
 	ContainerStatuses []ContainerStatus
+
+	// List of user-initiated ephemeral containers that have been run in this pod.
+	// +optional
+	EphemeralContainers []EphemeralContainer
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
