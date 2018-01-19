@@ -429,3 +429,45 @@ func TestPortForwardLocation(t *testing.T) {
 		}
 	}
 }
+
+// TODO(verb): make a real test
+func TestEphemeraLocation(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	tcs := []struct {
+		in          *api.Pod
+		info        *client.ConnectionInfo
+		expectedErr error
+		expectedURL *url.URL
+	}{
+		{
+			in: &api.Pod{
+				Spec: api.PodSpec{},
+			},
+			expectedErr: errors.NewBadRequest("pod test does not have a host assigned"),
+		},
+		{
+			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "pod1",
+				},
+				Spec: api.PodSpec{
+					NodeName: "node1",
+				},
+			},
+			info:        &client.ConnectionInfo{},
+			expectedURL: &url.URL{Host: ":", Path: "/ephemera/ns/pod1"},
+		},
+	}
+	for _, tc := range tcs {
+		getter := &mockPodGetter{tc.in}
+		connectionGetter := &mockConnectionInfoGetter{tc.info}
+		loc, _, err := EphemeraLocation(getter, connectionGetter, ctx, "test")
+		if !reflect.DeepEqual(err, tc.expectedErr) {
+			t.Errorf("expected %v, got %v", tc.expectedErr, err)
+		}
+		if !reflect.DeepEqual(loc, tc.expectedURL) {
+			t.Errorf("expected %v, got %v", tc.expectedURL, loc)
+		}
+	}
+}

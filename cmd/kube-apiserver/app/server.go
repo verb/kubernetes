@@ -396,7 +396,7 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 	genericConfig.EnableMetrics = true
 	genericConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(
 		sets.NewString("watch", "proxy"),
-		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
+		sets.NewString("attach", "exec", "proxy", "log", "portforward", "ephemera"),
 	)
 
 	kubeVersion := version.Get()

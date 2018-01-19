@@ -574,3 +574,32 @@ func PortForwardLocation(
 	}
 	return loc, nodeInfo.Transport, nil
 }
+
+// EphemeraLocation returns the port-forward URL for a pod.
+func EphemeraLocation(
+	getter ResourceGetter,
+	connInfo client.ConnectionInfoGetter,
+	ctx genericapirequest.Context,
+	name string,
+) (*url.URL, http.RoundTripper, error) {
+	pod, err := getPod(getter, ctx, name)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	nodeName := types.NodeName(pod.Spec.NodeName)
+	if len(nodeName) == 0 {
+		// If pod has not been assigned a host, return an empty location
+		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
+	}
+	nodeInfo, err := connInfo.GetConnectionInfo(nodeName)
+	if err != nil {
+		return nil, nil, err
+	}
+	loc := &url.URL{
+		Scheme: nodeInfo.Scheme,
+		Host:   net.JoinHostPort(nodeInfo.Hostname, nodeInfo.Port),
+		Path:   fmt.Sprintf("/ephemera/%s/%s", pod.Namespace, pod.Name),
+	}
+	return loc, nodeInfo.Transport, nil
+}

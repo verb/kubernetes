@@ -191,6 +191,39 @@ func (r *PortForwardREST) Connect(ctx genericapirequest.Context, name string, op
 	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, true, responder), nil
 }
 
+// EphemeraREST implements the ephemera subresource for a Pod
+type EphemeraREST struct {
+	Store       *genericregistry.Store
+	KubeletConn client.ConnectionInfoGetter
+}
+
+// Implement Connecter
+var _ = rest.Connecter(&EphemeraREST{})
+
+// New returns an empty pod resource
+func (r *EphemeraREST) New() runtime.Object {
+	return &api.Pod{}
+}
+
+// ConnectMethods returns the list of HTTP methods that can be proxied
+func (r *EphemeraREST) ConnectMethods() []string {
+	return proxyMethods
+}
+
+// NewConnectOptions returns versioned resource that represents proxy parameters
+func (r *EphemeraREST) NewConnectOptions() (runtime.Object, bool, string) {
+	return nil, false, ""
+}
+
+// Connect returns a handler for the pod ephemera proxy
+func (r *EphemeraREST) Connect(ctx genericapirequest.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
+	location, transport, err := pod.EphemeraLocation(r.Store, r.KubeletConn, ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	return newThrottledUpgradeAwareProxyHandler(location, transport, false, false, true, responder), nil
+}
+
 func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired, interceptRedirects bool, responder rest.Responder) *proxy.UpgradeAwareHandler {
 	handler := proxy.NewUpgradeAwareHandler(location, transport, wrapTransport, upgradeRequired, proxy.NewErrorResponder(responder))
 	handler.InterceptRedirects = interceptRedirects && utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StreamingProxyRedirects)
