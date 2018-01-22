@@ -48,11 +48,13 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/httplog"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flushwriter"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/v1/validation"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
@@ -174,6 +176,7 @@ type HostInterface interface {
 	RunInContainer(name string, uid types.UID, container string, cmd []string) ([]byte, error)
 	ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error
 	AttachContainer(name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error
+	RunDebugContainer(pod *v1.Pod, container *v1.EphemeralContainer) error
 	GetKubeletContainerLogs(podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
 	ServeLogs(w http.ResponseWriter, req *http.Request)
 	PortForward(name string, uid types.UID, port int32, stream io.ReadWriteCloser) error
@@ -362,6 +365,14 @@ func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 
 	ws = new(restful.WebService)
 	ws.
+		Path("/ephemera")
+	ws.Route(ws.POST("/{podNamespace}/{podID}").
+		To(s.postEphemera).
+		Operation("postEphemera"))
+	s.restfulCont.Add(ws)
+
+	ws = new(restful.WebService)
+	ws.
 		Path(logsPath)
 	ws.Route(ws.GET("").
 		To(s.getLogs).
@@ -428,7 +439,7 @@ func (s *Server) InstallDebuggingDisabledHandlers() {
 
 	paths := []string{
 		"/run/", "/exec/", "/attach/", "/portForward/", "/containerLogs/",
-		"/runningpods/", pprofBasePath, logsPath}
+		"/ephemera/", "/runningpods/", pprofBasePath, logsPath}
 	for _, p := range paths {
 		s.restfulCont.Handle(p, h)
 	}
@@ -601,6 +612,8 @@ type execRequestParams struct {
 	podUID        types.UID
 	containerName string
 	cmd           []string
+	debugName     string
+	imageName     string
 }
 
 func getExecRequestParams(req *restful.Request) execRequestParams {
@@ -702,6 +715,51 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 		s.host.StreamingConnectionIdleTimeout(),
 		remotecommandconsts.DefaultStreamCreationTimeout,
 		remotecommandconsts.SupportedStreamingProtocols)
+}
+
+// postEphemera handles requests to run a Debug Container in a pod
+func (s *Server) postEphemera(request *restful.Request, response *restful.Response) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DebugContainers) {
+		err := fmt.Errorf("debug containers feature disabled")
+		utilruntime.HandleError(err)
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
+	/* TODO(verb): use the API, obviously.
+	var ec v1.EphemeralContainer
+	codec := legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Group: v1.GroupName, Version: "v1"})
+	if err := runtime.DecodeInto(codec, request.Request.Body, &ec); err != nil {
+		utilruntime.HandleError(err)
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+	*/
+	ec := v1.EphemeralContainer{
+		Spec: &v1.Container{
+			Name:    "debug",
+			Image:   "alpine",
+			Command: []string{"sh"},
+			TTY:     true,
+			Stdin:   true,
+		},
+	}
+
+	pod, ok := s.host.GetPodByName(request.PathParameter("podNamespace"), request.PathParameter("podID"))
+	if !ok {
+		response.WriteError(http.StatusNotFound, fmt.Errorf("pod does not exist"))
+		return
+	}
+
+	glog.V(5).Infof("Creating a Debug Container named %s/%s", pod.Name, ec.Spec.Name)
+
+	if err := s.host.RunDebugContainer(pod, &ec); err != nil {
+		utilruntime.HandleError(err)
+		response.WriteError(http.StatusInternalServerError, err)
+		return
+	}
+	// TODO(verb): serve some sort of response or something
+	writeJsonResponse(response, nil)
 }
 
 // getRun handles requests to run a command inside a container.
