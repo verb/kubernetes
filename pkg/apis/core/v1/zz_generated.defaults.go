@@ -33,6 +33,7 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1.ConfigMapList{}, func(obj interface{}) { SetObjectDefaults_ConfigMapList(obj.(*v1.ConfigMapList)) })
 	scheme.AddTypeDefaultingFunc(&v1.Endpoints{}, func(obj interface{}) { SetObjectDefaults_Endpoints(obj.(*v1.Endpoints)) })
 	scheme.AddTypeDefaultingFunc(&v1.EndpointsList{}, func(obj interface{}) { SetObjectDefaults_EndpointsList(obj.(*v1.EndpointsList)) })
+	scheme.AddTypeDefaultingFunc(&v1.EphemeralContainer{}, func(obj interface{}) { SetObjectDefaults_EphemeralContainer(obj.(*v1.EphemeralContainer)) })
 	scheme.AddTypeDefaultingFunc(&v1.LimitRange{}, func(obj interface{}) { SetObjectDefaults_LimitRange(obj.(*v1.LimitRange)) })
 	scheme.AddTypeDefaultingFunc(&v1.LimitRangeList{}, func(obj interface{}) { SetObjectDefaults_LimitRangeList(obj.(*v1.LimitRangeList)) })
 	scheme.AddTypeDefaultingFunc(&v1.Namespace{}, func(obj interface{}) { SetObjectDefaults_Namespace(obj.(*v1.Namespace)) })
@@ -47,6 +48,7 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1.PersistentVolumeList{}, func(obj interface{}) { SetObjectDefaults_PersistentVolumeList(obj.(*v1.PersistentVolumeList)) })
 	scheme.AddTypeDefaultingFunc(&v1.Pod{}, func(obj interface{}) { SetObjectDefaults_Pod(obj.(*v1.Pod)) })
 	scheme.AddTypeDefaultingFunc(&v1.PodList{}, func(obj interface{}) { SetObjectDefaults_PodList(obj.(*v1.PodList)) })
+	scheme.AddTypeDefaultingFunc(&v1.PodStatusResult{}, func(obj interface{}) { SetObjectDefaults_PodStatusResult(obj.(*v1.PodStatusResult)) })
 	scheme.AddTypeDefaultingFunc(&v1.PodTemplate{}, func(obj interface{}) { SetObjectDefaults_PodTemplate(obj.(*v1.PodTemplate)) })
 	scheme.AddTypeDefaultingFunc(&v1.PodTemplateList{}, func(obj interface{}) { SetObjectDefaults_PodTemplateList(obj.(*v1.PodTemplateList)) })
 	scheme.AddTypeDefaultingFunc(&v1.ReplicationController{}, func(obj interface{}) { SetObjectDefaults_ReplicationController(obj.(*v1.ReplicationController)) })
@@ -81,6 +83,50 @@ func SetObjectDefaults_EndpointsList(in *v1.EndpointsList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Endpoints(a)
+	}
+}
+
+func SetObjectDefaults_EphemeralContainer(in *v1.EphemeralContainer) {
+	if in.Spec != nil {
+		SetDefaults_Container(in.Spec)
+		for i := range in.Spec.Ports {
+			a := &in.Spec.Ports[i]
+			SetDefaults_ContainerPort(a)
+		}
+		for i := range in.Spec.Env {
+			a := &in.Spec.Env[i]
+			if a.ValueFrom != nil {
+				if a.ValueFrom.FieldRef != nil {
+					SetDefaults_ObjectFieldSelector(a.ValueFrom.FieldRef)
+				}
+			}
+		}
+		SetDefaults_ResourceList(&in.Spec.Resources.Limits)
+		SetDefaults_ResourceList(&in.Spec.Resources.Requests)
+		if in.Spec.LivenessProbe != nil {
+			SetDefaults_Probe(in.Spec.LivenessProbe)
+			if in.Spec.LivenessProbe.Handler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(in.Spec.LivenessProbe.Handler.HTTPGet)
+			}
+		}
+		if in.Spec.ReadinessProbe != nil {
+			SetDefaults_Probe(in.Spec.ReadinessProbe)
+			if in.Spec.ReadinessProbe.Handler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(in.Spec.ReadinessProbe.Handler.HTTPGet)
+			}
+		}
+		if in.Spec.Lifecycle != nil {
+			if in.Spec.Lifecycle.PostStart != nil {
+				if in.Spec.Lifecycle.PostStart.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(in.Spec.Lifecycle.PostStart.HTTPGet)
+				}
+			}
+			if in.Spec.Lifecycle.PreStop != nil {
+				if in.Spec.Lifecycle.PreStop.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(in.Spec.Lifecycle.PreStop.HTTPGet)
+				}
+			}
+		}
 	}
 }
 
@@ -304,12 +350,23 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 			}
 		}
 	}
+	for i := range in.Status.EphemeralContainers {
+		a := &in.Status.EphemeralContainers[i]
+		SetObjectDefaults_EphemeralContainer(a)
+	}
 }
 
 func SetObjectDefaults_PodList(in *v1.PodList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Pod(a)
+	}
+}
+
+func SetObjectDefaults_PodStatusResult(in *v1.PodStatusResult) {
+	for i := range in.Status.EphemeralContainers {
+		a := &in.Status.EphemeralContainers[i]
+		SetObjectDefaults_EphemeralContainer(a)
 	}
 }
 
