@@ -1600,6 +1600,22 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	// Fetch the pull secrets for the pod
 	pullSecrets := kl.getPullSecretsForPod(pod)
 
+	if o.updateType == kubetypes.SyncPodDebug && utilfeature.DefaultFeatureGate.Enabled(features.DebugContainers) {
+		glog.Infof("DEBUG: in SyncPod() starting debug container")
+		// TODO(verb): remove this panic on failed type assertion
+		runtime := kl.containerRuntime.(kubecontainer.DebugContainerRunner)
+		if err := runtime.StartEphemeralContainer(pod, podStatus, o.ephemeralContainer, pullSecrets); err == nil {
+			glog.Infof("DEBUG: in SyncPod() started debug container successfully")
+			// TODO(verb): Start ephemeral container earlier in syncPod() so that apiPodStatus
+			// is updated with status/spec from the runtime rather than simply appended here
+			apiPodStatus.EphemeralContainers = append(apiPodStatus.EphemeralContainers, *o.ephemeralContainer)
+			kl.statusManager.SetPodStatus(pod, apiPodStatus)
+		}
+		// TODO(verb): what to do with error? send to reasonCache?
+		// TODO(verb): probably not call runtime's SyncPod... right?
+		return nil
+	}
+
 	// Call the container runtime's SyncPod callback
 	result := kl.containerRuntime.SyncPod(pod, apiPodStatus, podStatus, pullSecrets, kl.backOff)
 	kl.reasonCache.Update(pod.UID, result)

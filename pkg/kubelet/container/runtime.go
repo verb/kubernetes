@@ -175,7 +175,7 @@ type DebugContainerRunner interface {
 	// created by an API call and inserted into an already running pod to enable troubleshooting
 	// of that pod. The container configuration does not become part of the pod spec, but its
 	// status is reported in PodStatus. Debug containers are not restarted automatically.
-	RunDebugContainer(pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret) error
+	StartEphemeralContainer(pod *v1.Pod, podStatus *PodStatus, container *v1.EphemeralContainer, pullSecrets []v1.Secret) error
 }
 
 // Pod is a group of containers.

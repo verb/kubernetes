@@ -66,6 +66,8 @@ type UpdatePodOptions struct {
 	OnCompleteFunc OnCompleteFunc
 	// if update type is kill, use the specified options to kill the pod.
 	KillPodOptions *KillPodOptions
+	// if update type is SyncPodDebug, this is the Ephemeral Container to start
+	EphemeralContainer *v1.EphemeralContainer
 }
 
 // PodWorkers is an abstract interface for testability.
@@ -87,6 +89,8 @@ type syncPodOptions struct {
 	podStatus *kubecontainer.PodStatus
 	// if update type is kill, use the specified options to kill the pod.
 	killPodOptions *KillPodOptions
+	// if update type is SyncPodDebug, this is the Ephemeral Container to start
+	ephemeralContainer *v1.EphemeralContainer
 }
 
 // the function to invoke to perform a sync.
@@ -168,11 +172,12 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan UpdatePodOptions) {
 				return err
 			}
 			err = p.syncPodFn(syncPodOptions{
-				mirrorPod:      update.MirrorPod,
-				pod:            update.Pod,
-				podStatus:      status,
-				killPodOptions: update.KillPodOptions,
-				updateType:     update.UpdateType,
+				mirrorPod:          update.MirrorPod,
+				pod:                update.Pod,
+				podStatus:          status,
+				killPodOptions:     update.KillPodOptions,
+				updateType:         update.UpdateType,
+				ephemeralContainer: update.EphemeralContainer,
 			})
 			lastSyncTime = time.Now()
 			return err
@@ -226,6 +231,8 @@ func (p *podWorkers) UpdatePod(options *UpdatePodOptions) {
 		if !found || update.UpdateType != kubetypes.SyncPodKill {
 			p.lastUndeliveredWorkUpdate[pod.UID] = *options
 		}
+		// TODO(verb): prevent anything but a kill request from overwriting a debug request
+		// perhaps by tracking debug requests separately
 	}
 }
 

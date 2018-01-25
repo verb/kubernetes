@@ -1642,26 +1642,32 @@ func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port int32,
 	return streamingRuntime.PortForward(&pod, port, stream)
 }
 
-func (kl *Kubelet) RunDebugContainer(pod *v1.Pod, container *v1.Container) error {
-	// Only the generic runtime manager supports Debug Containers
-	r, ok := kl.containerRuntime.(kubecontainer.DebugContainerRunner)
-	if !ok {
-		return fmt.Errorf("runtime %v does not support debug containers", kl.containerRuntime.Type())
+func (kl *Kubelet) RunDebugContainer(pod *v1.Pod, container *v1.EphemeralContainer) error {
+	// TODO(verb): update log message
+	glog.V(5).Infof("Scheduling sync of new Debug Container %s in pod %s", container.Spec.Name, pod.Name)
+
+	errChan := make(chan error, 1)
+	syncPodCallback := func(e error) {
+		errChan <- e
 	}
 
-	if err := r.RunDebugContainer(pod, container, kl.getPullSecretsForPod(pod)); err != nil {
-		return err
-	}
-
-	// Schedule a sync so that the api server gets a ContainerStatus as soon as possible.
-	// We don't rely on the apiserver having up-to-date status, but it's nice.
-	glog.V(5).Infof("Scheduling sync of new Debug Container %s in pod %s", container.Name, pod.Name)
 	mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 	kl.podWorkers.UpdatePod(&UpdatePodOptions{
-		Pod:        pod,
-		MirrorPod:  mirrorPod,
-		UpdateType: kubetypes.SyncPodSync,
+		Pod:                pod,
+		MirrorPod:          mirrorPod,
+		UpdateType:         kubetypes.SyncPodDebug,
+		EphemeralContainer: container,
+		OnCompleteFunc:     syncPodCallback,
 	})
+
+	timeout := time.NewTimer(time.Second * 30) // TODO(verb): configurable
+	select {
+	case <-timeout.C:
+		// TODO(verb): handle timeout because OnCompleteFunc is not guaranteed to be called
+		return fmt.Errorf("timeout waiting for start of debug container %s", container.Spec.Name)
+	case e := <-errChan:
+		return e
+	}
 
 	return nil
 }

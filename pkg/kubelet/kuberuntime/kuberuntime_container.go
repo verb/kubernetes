@@ -826,31 +826,17 @@ func (m *kubeGenericRuntimeManager) RunInContainer(id kubecontainer.ContainerID,
 	return append(stdout, stderr...), err
 }
 
-// RunDebugContainer creates a Debug Container described by container in pod if it is not
-// already running. The container configuration does not become part of the pod spec, but its
-// status is reported in PodStatus. Return success if the debug container is already running.
-func (m *kubeGenericRuntimeManager) RunDebugContainer(pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret) error {
+// StartEphemeralContainer creates a Debug Container in a pod. It's called from the same goroutine as SyncPod()
+func (m *kubeGenericRuntimeManager) StartEphemeralContainer(pod *v1.Pod, podStatus *kubecontainer.PodStatus, container *v1.EphemeralContainer, pullSecrets []v1.Secret) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DebugContainers) {
 		return errors.New("Debug Containers feature disabled")
 	}
 
-	if kubecontainer.GetContainerSpec(pod, container.Name) != nil {
-		return fmt.Errorf("container name %s conflicts with container in pod spec", container.Name)
+	if kubecontainer.GetContainerSpec(pod, container.Spec.Name) != nil {
+		return fmt.Errorf("container name %s conflicts with container in pod spec", container.Spec.Name)
 	}
-
-	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
-	if err != nil {
-		return err
-	} else if len(podStatus.SandboxStatuses) == 0 {
-		return fmt.Errorf("pod %v/%v not running", pod.Namespace, pod.Name)
-	}
-
-	// We haven't reached consensus yet on how to handle reattaching, so in the mean time RunDebugContainer()
-	// returns success if the container already exists and is running. getDebug() will then implicitly reattach.
-	for _, c := range podStatus.ContainerStatuses {
-		if c.Name == container.Name && c.State == kubecontainer.ContainerStateRunning {
-			return nil
-		}
+	if container.TargetContainerName != "" && kubecontainer.GetContainerSpec(pod, container.TargetContainerName) == nil {
+		return fmt.Errorf("target container %s does not exist in pod spec", container.TargetContainerName)
 	}
 
 	podSandboxConfig, err := m.generatePodSandboxConfig(pod, 0)
@@ -858,7 +844,8 @@ func (m *kubeGenericRuntimeManager) RunDebugContainer(pod *v1.Pod, container *v1
 		return err
 	}
 
-	if msg, err := m.startContainer(podStatus.SandboxStatuses[0].Id, podSandboxConfig, container, pod, podStatus, pullSecrets, podStatus.IP, kubecontainer.ContainerTypeDebug); err != nil {
+	// TODO(verb): add TargetContainerName
+	if msg, err := m.startContainer(podStatus.SandboxStatuses[0].Id, podSandboxConfig, container.Spec, pod, podStatus, pullSecrets, podStatus.IP, kubecontainer.ContainerTypeDebug); err != nil {
 		return fmt.Errorf("cannot start debug container: %v (%v)", err, msg)
 	}
 
