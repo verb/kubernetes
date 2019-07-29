@@ -84,7 +84,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 			args:                  []string{"foo"},
 			expectedPodName:       "foo",
 			expectedContainerName: "bar",
-			obj:                   attachPod(),
+			obj: attachPod(),
 		},
 		{
 			name:                  "container in flag",
@@ -92,7 +92,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 			args:                  []string{"foo"},
 			expectedPodName:       "foo",
 			expectedContainerName: "bar",
-			obj:                   attachPod(),
+			obj: attachPod(),
 		},
 		{
 			name:                  "init container in flag",
@@ -100,7 +100,15 @@ func TestPodAndContainerAttach(t *testing.T) {
 			args:                  []string{"foo"},
 			expectedPodName:       "foo",
 			expectedContainerName: "initfoo",
-			obj:                   attachPod(),
+			obj: attachPod(),
+		},
+		{
+			name:                  "ephemeral container in flag",
+			options:               &AttachOptions{StreamOptions: exec.StreamOptions{ContainerName: "debugger"}, GetPodTimeout: 30},
+			args:                  []string{"foo"},
+			expectedPodName:       "foo",
+			expectedContainerName: "debugger",
+			obj: attachPod(),
 		},
 		{
 			name:            "non-existing container",
@@ -116,7 +124,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 			args:                  []string{"pods", "foo"},
 			expectedPodName:       "foo",
 			expectedContainerName: "bar",
-			obj:                   attachPod(),
+			obj: attachPod(),
 		},
 		{
 			name:                  "invalid get pod timeout value",
@@ -124,8 +132,8 @@ func TestPodAndContainerAttach(t *testing.T) {
 			args:                  []string{"pod/foo"},
 			expectedPodName:       "foo",
 			expectedContainerName: "bar",
-			obj:                   attachPod(),
-			expectError:           "must be higher than zero",
+			obj:         attachPod(),
+			expectError: "must be higher than zero",
 		},
 	}
 
@@ -412,6 +420,13 @@ func attachPod() *corev1.Pod {
 			InitContainers: []corev1.Container{
 				{
 					Name: "initfoo",
+				},
+			},
+			EphemeralContainers: []corev1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+						Name: "debugger",
+					},
 				},
 			},
 		},
