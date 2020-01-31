@@ -60,12 +60,17 @@ const (
 	PriorityClassV1Alpha1GeneratorName      = "priorityclass/v1alpha1"
 	PriorityClassV1Beta1GeneratorName       = "priorityclass/v1beta1"
 	PriorityClassV1GeneratorName            = "priorityclass/v1"
+	DebugContainerGeneratorName             = "ephemeralcontainer/v1"
 )
 
 // DefaultGenerators returns the set of default generators for use in Factory instances
 func DefaultGenerators(cmdName string) map[string]generate.Generator {
 	var generator map[string]generate.Generator
 	switch cmdName {
+	case "debug":
+		generator = map[string]generate.Generator{
+			DebugContainerGeneratorName: DebugContainer{},
+		}
 	case "expose":
 		generator = map[string]generate.Generator{
 			ServiceV1GeneratorName: ServiceGeneratorV1{},
