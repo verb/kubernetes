@@ -568,3 +568,8 @@ func WaitForPodContainerToFail(c clientset.Interface, namespace, podName string,
 func WaitForPodContainerStarted(c clientset.Interface, namespace, podName string, containerIndex int, timeout time.Duration) error {
 	return wait.PollImmediate(poll, timeout, podContainerStarted(c, namespace, podName, containerIndex))
 }
+
+// WaitForPodContainerNameRunning waits for the given Pod container to have a state of running
+func WaitForPodContainerNameRunning(c clientset.Interface, namespace, podName, containerName string, timeout time.Duration) error {
+	return wait.PollImmediate(poll, timeout, podContainerNameRunning(c, namespace, podName, containerName))
+}
